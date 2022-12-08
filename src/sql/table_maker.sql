@@ -1,10 +1,7 @@
-create type StaffType as enum('SustcManager', 'CompanyManager', 'Courier', 'SeaportOfficer');
-create type ContainerType as enum('Dry', 'FlatRack', 'ISOTank', 'OpenTop', 'Reefer');
-create type ItemStateType as enum('PickingUp','ToExportTransporting', 'ExportChecking', 'ExportCheckFailed', 'PackingToContainer', 'WaitingForShipping', 'Shipping', 'UnpackingFromContainer', 'ImportChecking', 'ImportCheckFailed', 'FromImportTransporting', 'Delivering', 'Finish');
 create table if not exists staff (
     name varchar not null,
     password varchar not null,
-    type StaffType not null,
+    type varchar not null,
     city varchar,
     gender boolean not null,
     phone_number varchar not null,
@@ -40,7 +37,7 @@ create table if not exists ship(
 create table if not exists container(
     item_name varchar not null,
     code varchar,
-    type ContainerType,
+    type varchar,
     primary key (item_name)
 );
 
@@ -62,7 +59,7 @@ create table if not exists item(
     name varchar not null,
     type varchar not null,
     price numeric(20, 7) not null,
-    state ItemStateType not null,
+    state varchar not null,
 
     primary key (name)
 );

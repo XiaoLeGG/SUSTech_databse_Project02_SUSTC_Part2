@@ -6,6 +6,3 @@ drop table import_information;
 drop table export_information;
 drop table staff;
 drop table item;
-drop type StaffType;
-drop type ContainerType;
-drop type ItemStateType;
