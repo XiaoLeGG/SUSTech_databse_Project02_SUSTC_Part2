@@ -1,4 +1,5 @@
-import java.sql.*;
+package main;
+
 public class Main {
     private static String url = "jdbc:postgresql://localhost:5432/postgres";
         private static String user = "postgres";

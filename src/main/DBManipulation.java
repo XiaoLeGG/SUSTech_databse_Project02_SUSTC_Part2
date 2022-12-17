@@ -1,16 +1,25 @@
-package cn.edu.sustech.dbms2;
+package main;
 
-import cs307.project2.interfaces.*;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Calendar;
 import java.util.Scanner;
 
-public class DatabaseManager implements IDatabaseManipulation {
+import cs307.project2.interfaces.ContainerInfo;
+import cs307.project2.interfaces.IDatabaseManipulation;
+import cs307.project2.interfaces.ItemInfo;
+import cs307.project2.interfaces.ItemState;
+import cs307.project2.interfaces.LogInfo;
+import cs307.project2.interfaces.ShipInfo;
+import cs307.project2.interfaces.StaffInfo;
+import cs307.project2.interfaces.LogInfo.StaffType;
+
+public class DBManipulation implements IDatabaseManipulation {
 	
 	private String database, root, pass;
 	private Connection conn;
@@ -24,41 +33,74 @@ public class DatabaseManager implements IDatabaseManipulation {
 		}
 	}
 
-	public DatabaseManager(String database, String root, String pass) {
+	public DBManipulation(String database, String root, String pass) {
 		this.database = database;
 		this.root = root;
 		this.pass = pass;
 		try {
 			conn = DriverManager.getConnection(database, root, pass);
 			Statement sta = this.conn.createStatement();
-			sta.executeUpdate("create table if not exists staff (" + "    name varchar not null,"
-					+ "    password varchar not null," + "    type varchar not null," + "    city varchar,"
-					+ "    gender boolean not null," + "    phone_number varchar not null,"
-					+ "    birth_year integer not null," + "    company varchar," + "    primary key (name)" + ");"
-					+ "create table if not exists export_information (" + "    item_name varchar not null,"
-					+ "    city varchar not null," + "    tax numeric(20, 7) not null,"
-					+ "    staff_name varchar references staff(name)," + "    primary key (item_name)" + ");"
-					+ "create table if not exists import_information(" + "    item_name varchar not null,"
-					+ "    city varchar not null," + "    tax numeric(20, 7) not null,"
-					+ "    staff_name varchar references staff(name)," + "    primary key (item_name)" + ");"
-					+ "create table if not exists ship(" + "    item_name varchar not null," + "    ship_name varchar,"
-					+ "    company varchar not null," + "    primary key (item_name)" + ");"
-					+ "create table if not exists container(" + "    item_name varchar not null," + "    code varchar,"
-					+ "    type varchar," + "    primary key (item_name)" + ");"
-					+ "create table if not exists retrieval_information(" + "    item_name varchar not null,"
-					+ "    city varchar not null," + "    staff_name varchar not null references staff(name),"
-					+ "    primary key (item_name)" + ");" + "create table if not exists delivery_information("
-					+ "    item_name varchar not null," + "    city varchar not null,"
-					+ "    staff_name varchar references staff(name)," + "    primary key (item_name)" + ");"
-					+ "create table if not exists item(" + "    name varchar not null," + "    type varchar not null,"
-					+ "    price numeric(20, 7) not null," + "    state varchar not null," + "    primary key (name)"
+			sta.executeUpdate("create table if not exists staff (" 
+					+ "    name varchar not null,"
+					+ "    password varchar not null," 
+					+ "    type varchar not null," 
+					+ "    city varchar,"
+					+ "    gender boolean not null," 
+					+ "    phone_number varchar not null,"
+					+ "    birth_year integer not null," 
+					+ "    company varchar," 
+					+ "    primary key (name)" 
 					+ ");"
-					+ "alter table delivery_information add constraint  ForeignKey_DeliveryInformation_ItemName foreign key (item_name) references item(name);"
-					+ "alter table retrieval_information add constraint  ForeignKey_RetrievalInformation_ItemName foreign key (item_name) references item(name);"
-					+ "alter table export_information add constraint  ForeignKey_ExportInformation_ItemName foreign key (item_name) references item(name);"
-					+ "alter table import_information add constraint  ForeignKey_ImportInformation_ItemName foreign key (item_name) references item(name);"
-					+ "alter table ship add constraint ForeignKey_Ship_ItemName foreign key (item_name) references item(name);"
-					+ "alter table container add constraint ForeignKey_Container_ItemName foreign key (item_name) references item(name);");
+					+ "create table if not exists export_information (" 
+					+ "    item_name varchar not null,"
+					+ "    city varchar not null," 
+					+ "    tax numeric(20, 7) not null,"
+					+ "    staff_name varchar references staff(name)," 
+					+ "    primary key (item_name)" 
+					+ ");"
+					+ "create table if not exists import_information(" 
+					+ "    item_name varchar not null,"
+					+ "    city varchar not null," 
+					+ "    tax numeric(20, 7) not null,"
+					+ "    staff_name varchar references staff(name)," 
+					+ "    primary key (item_name)" 
+					+ ");"
+					+ "create table if not exists ship(" 
+					+ "    item_name varchar not null," 
+					+ "    ship_name varchar,"
+					+ "    company varchar not null," 
+					+ "    primary key (item_name)" 
+					+ ");"
+					+ "create table if not exists container(" 
+					+ "    item_name varchar not null," 
+					+ "    code varchar,"
+					+ "    type varchar," 
+					+ "    primary key (item_name)" 
+					+ ");"
+					+ "create table if not exists retrieval_information(" 
+					+ "    item_name varchar not null,"
+					+ "    city varchar not null," 
+					+ "    staff_name varchar not null references staff(name),"
+					+ "    primary key (item_name)" 
+					+ ");" 
+					+ "create table if not exists delivery_information("
+					+ "    item_name varchar not null," 
+					+ "    city varchar not null,"
+					+ "    staff_name varchar references staff(name)," 
+					+ "    primary key (item_name)" + ");"
+					+ "create table if not exists item(" 
+					+ "    name varchar not null," 
+					+ "    type varchar not null,"
+					+ "    price numeric(20, 7) not null," 
+					+ "    state varchar not null," 
+					+ "    primary key (name)"
+					+ ");"
+					+ "alter table delivery_information add constraint foreignKey_deliveryInformation_itemName foreign key (item_name) references item(name);"
+					+ "alter table retrieval_information add constraint foreignKey_retrievalInformation_itemName foreign key (item_name) references item(name);"
+					+ "alter table export_information add constraint foreignKey_exportInformation_itemName foreign key (item_name) references item(name);"
+					+ "alter table import_information add constraint foreignKey_importInformation_itemName foreign key (item_name) references item(name);"
+					+ "alter table ship add constraint foreignKey_ship_itemName foreign key (item_name) references item(name);"
+					+ "alter table container add constraint foreignKey_container_itemName foreign key (item_name) references item(name);");
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
@@ -322,100 +364,153 @@ public class DatabaseManager implements IDatabaseManipulation {
 		long end = System.currentTimeMillis();
 		System.out.println("Total Time = " + (end - start) + " ms");
 	}
-
+	
+	//Need Type Check?
+	private static final String checkUserSQL = "SELECT * FROM staff where name = ? AND password = ? ";
+	
+	
+	private boolean checkUser(LogInfo logInfo) throws SQLException {
+		PreparedStatement statement = this.conn.prepareStatement(checkUserSQL);
+		ResultSet rs = statement.executeQuery();
+		return rs.next();
+	}
+		
+	
+	
+	private static final String getImportTaxRateSQL = "";
+	//Company Manager User
 	@Override
 	public double getImportTaxRate(LogInfo logInfo, String s, String s1) {
+		try {
+			if (logInfo.type() != StaffType.CompanyManager || !checkUser(logInfo)) {
+				return -1;
+			}
+			
+			
+		} catch (SQLException e) {
+			Main.getThrowableHandler().feedBackThrowable(e);
+		}
 		
 		return 0;
 	}
-
+	
+	//Company Manager User
 	@Override
 	public double getExportTaxRate(LogInfo logInfo, String s, String s1) {
 		return 0;
 	}
-
+	
+	//Company Manager User
 	@Override
 	public boolean loadItemToContainer(LogInfo logInfo, String s, String s1) {
 		return false;
 	}
-
+	
+	//Company Manager User
 	@Override
 	public boolean loadContainerToShip(LogInfo logInfo, String s, String s1) {
 		return false;
 	}
-
+	
+	//Company Manager User
 	@Override
 	public boolean shipStartSailing(LogInfo logInfo, String s) {
 		return false;
 	}
-
+	
+	//Company Manager User
 	@Override
 	public boolean unloadItem(LogInfo logInfo, String s) {
 		return false;
 	}
-
+	
+	//Company Manager User
 	@Override
 	public boolean itemWaitForChecking(LogInfo logInfo, String s) {
 		return false;
 	}
-
+	
+	//Courier User
 	@Override
 	public boolean newItem(LogInfo logInfo, ItemInfo itemInfo) {
 		return false;
 	}
-
+	
+	//Courier User
 	@Override
 	public boolean setItemState(LogInfo logInfo, String s, ItemState itemState) {
 		return false;
 	}
-
+	
+	//Seaport Officer User
 	@Override
 	public String[] getAllItemsAtPort(LogInfo logInfo) {
 		return new String[0];
 	}
-
+	
+	//Seaport Officer User
 	@Override
 	public boolean setItemCheckState(LogInfo logInfo, String s, boolean b) {
 		return false;
 	}
-
+	
+	
+	private static final String getCompanyCountSQL = "select count(*) from ";
+	//SUSTC Department Manager User
 	@Override
 	public int getCompanyCount(LogInfo logInfo) {
+		try {
+			if (logInfo.type() != StaffType.SustcManager || !checkUser(logInfo)) {
+				return -1;
+			}
+			
+			
+		} catch (SQLException e) {
+			Main.getThrowableHandler().feedBackThrowable(e);
+		}
 		return 0;
 	}
-
+	
+	//SUSTC Department Manager User
 	@Override
 	public int getCityCount(LogInfo logInfo) {
 		return 0;
 	}
-
+	
+	//SUSTC Department Manager User
 	@Override
 	public int getCourierCount(LogInfo logInfo) {
 		return 0;
 	}
-
+	
+	//SUSTC Department Manager User
 	@Override
 	public int getShipCount(LogInfo logInfo) {
 		return 0;
 	}
-
+	
+	//SUSTC Department Manager User
 	@Override
 	public ItemInfo getItemInfo(LogInfo logInfo, String s) {
 		return null;
 	}
-
+	
+	//SUSTC Department Manager User
 	@Override
 	public ShipInfo getShipInfo(LogInfo logInfo, String s) {
 		return null;
 	}
-
+	
+	//SUSTC Department Manager User
 	@Override
 	public ContainerInfo getContainerInfo(LogInfo logInfo, String s) {
 		return null;
 	}
-
+	
+	//SUSTC Department Manager User
 	@Override
 	public StaffInfo getStaffInfo(LogInfo logInfo, String s) {
 		return null;
 	}
+
 }
