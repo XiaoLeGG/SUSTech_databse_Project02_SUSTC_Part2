@@ -8,16 +8,18 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Calendar;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 import java.util.Scanner;
 
-import cs307.project2.interfaces.ContainerInfo;
-import cs307.project2.interfaces.IDatabaseManipulation;
-import cs307.project2.interfaces.ItemInfo;
-import cs307.project2.interfaces.ItemState;
-import cs307.project2.interfaces.LogInfo;
-import cs307.project2.interfaces.ShipInfo;
-import cs307.project2.interfaces.StaffInfo;
-import cs307.project2.interfaces.LogInfo.StaffType;
+import main.interfaces.*;
+import main.interfaces.ContainerInfo.Type;
+import main.interfaces.ItemInfo.ImportExportInfo;
+import main.interfaces.ItemInfo.RetrievalDeliveryInfo;
+import main.interfaces.ItemState;
+import main.interfaces.LogInfo.StaffType;
+
 
 public class DBManipulation implements IDatabaseManipulation {
 	
@@ -38,7 +40,12 @@ public class DBManipulation implements IDatabaseManipulation {
 		this.root = root;
 		this.pass = pass;
 		try {
-			conn = DriverManager.getConnection(database, root, pass);
+			Properties properties = new Properties();
+			properties.setProperty("user", root);
+			properties.setProperty("password", pass);
+			properties.setProperty("useSSL", "false");
+			properties.setProperty("autoReconnect", "true");
+			conn = DriverManager.getConnection("jdbc:postgresql://" + database, root, pass);
 			Statement sta = this.conn.createStatement();
 			sta.executeUpdate("create table if not exists staff (" 
 					+ "    name varchar not null,"
@@ -371,6 +378,8 @@ public class DBManipulation implements IDatabaseManipulation {
 	
 	private boolean checkUser(LogInfo logInfo) throws SQLException {
 		PreparedStatement statement = this.conn.prepareStatement(checkUserSQL);
+		statement.setString(1, logInfo.name());
+		statement.setString(2, logInfo.password());
 		ResultSet rs = statement.executeQuery();
 		return rs.next();
 	}
@@ -455,7 +464,7 @@ public class DBManipulation implements IDatabaseManipulation {
 	}
 	
 	
-	private static final String getCompanyCountSQL = "select count(*) from ";
+	private static final String getCompanyCountSQL = "SELECT count(*) FROM (SELECT DISTINCT company FROM staff WHERE company IS NOT NULL) tb";
 	//SUSTC Department Manager User
 	@Override
 	public int getCompanyCount(LogInfo logInfo) {
@@ -464,52 +473,303 @@ public class DBManipulation implements IDatabaseManipulation {
 				return -1;
 			}
 			
-			
+			PreparedStatement statement = this.conn.prepareStatement(getCompanyCountSQL);
+			ResultSet rs = statement.executeQuery();
+			if (rs.next()) {
+				return rs.getInt(1);
+			} else {
+				return 0;
+			}
 		} catch (SQLException e) {
 			Main.getThrowableHandler().feedBackThrowable(e);
 		}
-		return 0;
+		return -1;
 	}
 	
+	private static final String getCityCountSQL = "SELECT count(*) from (\r\n"
+			+ "    SELECT DISTINCT city FROM (\r\n"
+			+ "        SELECT DISTINCT city FROM retrieval_information UNION DISTINCT\r\n"
+			+ "        (SELECT DISTINCT city FROM delivery_information) UNION DISTINCT\r\n"
+			+ "        (SELECT DISTINCT city FROM export_information) UNION DISTINCT\r\n"
+			+ "        (SELECT DISTINCT city from import_information)\r\n"
+			+ "        )t1)t0;";
 	//SUSTC Department Manager User
 	@Override
 	public int getCityCount(LogInfo logInfo) {
-		return 0;
+		try {
+			if (logInfo.type() != StaffType.SustcManager || !checkUser(logInfo)) {
+				return -1;
+			}
+			
+			PreparedStatement statement = this.conn.prepareStatement(getCityCountSQL);
+			ResultSet rs = statement.executeQuery();
+			if (rs.next()) {
+				return rs.getInt(1);
+			} else {
+				return 0;
+			}
+		} catch (SQLException e) {
+			Main.getThrowableHandler().feedBackThrowable(e);
+		}
+		return -1;
 	}
 	
+	private static final String getCourierCountSQL = "SELECT count(*) FROM staff WHERE type = 'Courier'";
 	//SUSTC Department Manager User
 	@Override
 	public int getCourierCount(LogInfo logInfo) {
-		return 0;
+		try {
+			if (logInfo.type() != StaffType.SustcManager || !checkUser(logInfo)) {
+				return -1;
+			}
+			
+			PreparedStatement statement = this.conn.prepareStatement(getCourierCountSQL);
+			ResultSet rs = statement.executeQuery();
+			if (rs.next()) {
+				return rs.getInt(1);
+			} else {
+				return 0;
+			}
+		} catch (SQLException e) {
+			Main.getThrowableHandler().feedBackThrowable(e);
+		}
+		return -1;
 	}
 	
+	private static final String getShipCountSQL = "SELECT count(*) FROM (SELECT DISTINCT ship_name FROM ship WHERE ship_name IS NOT NULl)t1;";
 	//SUSTC Department Manager User
 	@Override
 	public int getShipCount(LogInfo logInfo) {
-		return 0;
+		try {
+			if (logInfo.type() != StaffType.SustcManager || !checkUser(logInfo)) {
+				return -1;
+			}
+			
+			PreparedStatement statement = this.conn.prepareStatement(getShipCountSQL);
+			ResultSet rs = statement.executeQuery();
+			if (rs.next()) {
+				return rs.getInt(1);
+			} else {
+				return 0;
+			}
+		} catch (SQLException e) {
+			Main.getThrowableHandler().feedBackThrowable(e);
+		}
+		return -1;
 	}
 	
+	private static final Map<String, ItemState> stringStateMap = new HashMap<>();
+	private static final Map<ItemState, String> stateStringMap = new HashMap<>();
+	
+	static {
+		stringStateMap.put("Picking-up", ItemState.PickingUp);
+		stringStateMap.put("To-Export Transporting", ItemState.ToExportTransporting);
+		stringStateMap.put("Export Checking", ItemState.ExportChecking);
+		stringStateMap.put("Export Check Fail", ItemState.ExportCheckFailed);
+		stringStateMap.put("Packing to Container", ItemState.PackingToContainer);
+		stringStateMap.put("Waiting for Shipping", ItemState.WaitingForShipping);
+		stringStateMap.put("Shipping", ItemState.Shipping);
+		stringStateMap.put("Unpacking from Container", ItemState.UnpackingFromContainer);
+		stringStateMap.put("Import Checking", ItemState.ImportChecking);
+		stringStateMap.put("Import Check Fail", ItemState.ImportCheckFailed);
+		stringStateMap.put("From-Import Transporting", ItemState.FromImportTransporting);
+		stringStateMap.put("Delivering", ItemState.Delivering);
+		stringStateMap.put("Finish", ItemState.Finish);
+		
+		for (Map.Entry<String, ItemState> entry : stringStateMap.entrySet()) {
+			stateStringMap.put(entry.getValue(), entry.getKey());
+		}
+		
+	}
+	
+	private static ItemState getItemStateByDescription(String message) {
+		return stringStateMap.get(message);
+	}
+	
+	private static final String getItemSQL = "SELECT * FROM item WHERE name = ?";
+	private static final String getImportSQL = "SELECT city, staff_name, tax FROM import_information WHERE item_name = ?";
+	private static final String getExportSQL = "SELECT city, staff_name, tax FROM export_information WHERE item_name = ?";
+	private static final String getRetrievalSQL = "SELECT city, staff_name FROM retrieval_information WHERE item_name = ?";
+	private static final String getDeliverySQL = "SELECT city, staff_name FROM delivery_information WHERE item_name = ?";
 	//SUSTC Department Manager User
 	@Override
 	public ItemInfo getItemInfo(LogInfo logInfo, String s) {
+		try {
+			if (logInfo.type() != StaffType.SustcManager || !checkUser(logInfo)) {
+				return null;
+			}
+			PreparedStatement itemStatement = this.conn.prepareStatement(getItemSQL);
+			itemStatement.setString(1, s);
+			ResultSet itemRs = itemStatement.executeQuery();
+			if (itemRs.next()) {
+				PreparedStatement importStatement = this.conn.prepareStatement(getImportSQL);
+				importStatement.setString(1, s);
+				ResultSet importRs = importStatement.executeQuery();
+				importRs.next();
+				ImportExportInfo importInfo = new ImportExportInfo(importRs.getString(1), importRs.getString(2), importRs.getDouble(3));
+				
+				PreparedStatement exportStatement = this.conn.prepareStatement(getExportSQL);
+				exportStatement.setString(1, s);
+				ResultSet exportRs = exportStatement.executeQuery();
+				exportRs.next();
+				ImportExportInfo exportInfo = new ImportExportInfo(exportRs.getString(1), exportRs.getString(2), exportRs.getDouble(3));
+				
+				PreparedStatement retrievalStatement = this.conn.prepareStatement(getRetrievalSQL);
+				retrievalStatement.setString(1, s);
+				ResultSet retrievalRs = retrievalStatement.executeQuery();
+				retrievalRs.next();
+				RetrievalDeliveryInfo retrievalInfo = new RetrievalDeliveryInfo(retrievalRs.getString(1), retrievalRs.getString(2));
+				
+				PreparedStatement deliveryStatement = this.conn.prepareStatement(getDeliverySQL);
+				deliveryStatement.setString(1, s);
+				ResultSet deliveryRs = deliveryStatement.executeQuery();
+				deliveryRs.next();
+				RetrievalDeliveryInfo deliveryInfo = new RetrievalDeliveryInfo(deliveryRs.getString(1), deliveryRs.getString(2));
+
+				ItemInfo itemInfo = new ItemInfo(itemRs.getString(1), itemRs.getString(2), itemRs.getDouble(3), getItemStateByDescription(itemRs.getString(4)), retrievalInfo, deliveryInfo, importInfo, exportInfo);
+				return itemInfo;
+			} else {
+				return null;
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+			Main.getThrowableHandler().feedBackThrowable(e);
+		}
 		return null;
 	}
 	
+	private static final String getShipInfoSQL = "SELECT item_name, company FROM ship WHERE ship_name = ?";
 	//SUSTC Department Manager User
 	@Override
 	public ShipInfo getShipInfo(LogInfo logInfo, String s) {
+		try {
+			if (logInfo.type() != StaffType.SustcManager || !checkUser(logInfo)) {
+				return null;
+			}
+			PreparedStatement shipStatement = this.conn.prepareStatement(getShipInfoSQL);
+			shipStatement.setString(1, s);
+			ResultSet shipRs = shipStatement.executeQuery();
+			boolean isSailing = false;
+			String company = null;
+			while (shipRs.next()) {
+				if (company == null) {
+					company = shipRs.getString(2);
+				}
+				PreparedStatement itemStatement = this.conn.prepareStatement(getItemSQL);
+				itemStatement.setString(1, shipRs.getString(1));
+				ResultSet itemRs = itemStatement.executeQuery();
+				itemRs.next();
+				isSailing |= getItemStateByDescription(itemRs.getString(4)) == ItemState.Shipping;
+				if (isSailing) {
+					break;
+				}
+			}
+			if (company == null) {
+				return null;
+			}
+			ShipInfo shipInfo = new ShipInfo(s, company, isSailing);
+			return shipInfo;
+		} catch (SQLException e) {
+			Main.getThrowableHandler().feedBackThrowable(e);
+		}
 		return null;
 	}
 	
+	private static final Map<String, Type> stringContainerTypeMap = new HashMap<>();
+	private static final Map<Type, String> containerTypeStringMap = new HashMap<>();
+	static {
+		stringContainerTypeMap.put("Dry Container", Type.Dry);
+		stringContainerTypeMap.put("Flat Rack Container", Type.FlatRack);
+		stringContainerTypeMap.put("Open Top Container", Type.OpenTop);
+		stringContainerTypeMap.put("ISO Tank Container", Type.ISOTank);
+		stringContainerTypeMap.put("Reefer Container", Type.Reefer);
+		
+		for (Map.Entry<String, Type> entry : stringContainerTypeMap.entrySet()) {
+			containerTypeStringMap.put(entry.getValue(), entry.getKey());
+		}
+	}
+	
+	private static Type getContainerTypeByDescription(String description) {
+		return stringContainerTypeMap.get(description);
+	}
+	
+	private static final String getContainerInfoSQL = "SELECT item_name, type FROM container WHERE code = ?";
 	//SUSTC Department Manager User
 	@Override
 	public ContainerInfo getContainerInfo(LogInfo logInfo, String s) {
+		try {
+			if (logInfo.type() != StaffType.SustcManager || !checkUser(logInfo)) {
+				return null;
+			}
+			PreparedStatement containerStatement = this.conn.prepareStatement(getContainerInfoSQL);
+			containerStatement.setString(1, s);
+			ResultSet containerRs = containerStatement.executeQuery();
+			boolean isUsing = false;
+			String type = null;
+			while (containerRs.next()) {
+				if (type == null) {
+					type = containerRs.getString(2);
+				}
+				PreparedStatement itemStatement = this.conn.prepareStatement(getItemSQL);
+				itemStatement.setString(1, containerRs.getString(1));
+				ResultSet itemRs = itemStatement.executeQuery();
+				itemRs.next();
+				ItemState state = getItemStateByDescription(itemRs.getString(4));
+				isUsing |= (state == ItemState.WaitingForShipping) || (state == ItemState.Shipping) || (state == ItemState.UnpackingFromContainer) || (state == ItemState.PackingToContainer);
+				if (isUsing) {
+					break;
+				}
+			}
+			if (type == null) {
+				return null;
+			}
+			ContainerInfo containerInfo = new ContainerInfo(getContainerTypeByDescription(type), s, isUsing);
+			return containerInfo;
+		} catch (SQLException e) {
+			Main.getThrowableHandler().feedBackThrowable(e);
+		}
 		return null;
 	}
 	
+	private static final Map<String, StaffType> stringStaffTypeMap = new HashMap<>();
+	private static final Map<StaffType, String> staffTypeStringMap = new HashMap<>();
+	
+	static {
+		stringStaffTypeMap.put("Courier", StaffType.Courier);
+		stringStaffTypeMap.put("SUSTC Department Manager", StaffType.SustcManager);
+		stringStaffTypeMap.put("Company Manager", StaffType.CompanyManager);
+		stringStaffTypeMap.put("Seaport Officer", StaffType.SeaportOfficer);
+		
+		for (Map.Entry<String, StaffType> entry : stringStaffTypeMap.entrySet()) {
+			staffTypeStringMap.put(entry.getValue(), entry.getKey());
+		}
+		
+	}
+	
+	private static StaffType getStaffTypeByDescription(String description) {
+		return stringStaffTypeMap.get(description);
+	}
+	
+	private static final String getStaffInfoSQL = "SELECT * FROM staff WHERE name = ?";
 	//SUSTC Department Manager User
 	@Override
 	public StaffInfo getStaffInfo(LogInfo logInfo, String s) {
+		try {
+			if (logInfo.type() != StaffType.SustcManager || !checkUser(logInfo)) {
+				return null;
+			}
+			PreparedStatement statement = this.conn.prepareStatement(getStaffInfoSQL);
+			statement.setString(1, s);
+			ResultSet rs = statement.executeQuery();
+			if (!rs.next()) {
+				return null;
+			}
+			int birthYear = rs.getInt(7);
+			int currentYear = Calendar.getInstance().get(Calendar.YEAR);
+			return new StaffInfo(new LogInfo(s, getStaffTypeByDescription(rs.getString(3)), rs.getString(2)), rs.getString(8), rs.getString(4), rs.getBoolean(5), currentYear - birthYear, rs.getString(6));
+		} catch (SQLException e) {
+			Main.getThrowableHandler().feedBackThrowable(e);
+		}
 		return null;
 	}
 
