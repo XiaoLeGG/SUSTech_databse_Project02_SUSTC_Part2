@@ -64,9 +64,9 @@ create table if not exists item(
     primary key (name)
 );
 
-alter table delivery_information add constraint  ForeignKey_DeliveryInformation_ItemName foreign key (item_name) references item(name);
-alter table retrieval_information add constraint  ForeignKey_RetrievalInformation_ItemName foreign key (item_name) references item(name);
-alter table export_information add constraint  ForeignKey_ExportInformation_ItemName foreign key (item_name) references item(name);
-alter table import_information add constraint  ForeignKey_ImportInformation_ItemName foreign key (item_name) references item(name);
-alter table ship add constraint  ForeignKey_Ship_ItemName foreign key (item_name) references item(name);
-alter table container add constraint ForeignKey_Container_ItemName foreign key (item_name) references item(name);
+alter table delivery_information add constraint  foreignKey_deliveryInformation_itemName foreign key (item_name) references item(name);
+alter table retrieval_information add constraint  foreignKey_retrievalInformation_itemName foreign key (item_name) references item(name);
+alter table export_information add constraint  foreignKey_exportInformation_itemName foreign key (item_name) references item(name);
+alter table import_information add constraint  foreignKey_importInformation_itemName foreign key (item_name) references item(name);
+alter table ship add constraint  foreignKey_ship_itemName foreign key (item_name) references item(name);
+alter table container add constraint foreignKey_container_itemName foreign key (item_name) references item(name);
