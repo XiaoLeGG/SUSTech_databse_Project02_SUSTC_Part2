@@ -6,7 +6,7 @@ public final class ThrowableHandler {
 	}
 	
 	public void feedBackThrowable(Throwable t) {
-		
+		t.printStackTrace();
 	}
 	
 }
