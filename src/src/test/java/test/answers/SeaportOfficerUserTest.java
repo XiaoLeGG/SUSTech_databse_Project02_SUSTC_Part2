@@ -1,10 +1,10 @@
 package test.answers;
 
+import main.interfaces.LogInfo;
+
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
-
-import main.interfaces.LogInfo;
 
 public class SeaportOfficerUserTest implements Serializable {
 

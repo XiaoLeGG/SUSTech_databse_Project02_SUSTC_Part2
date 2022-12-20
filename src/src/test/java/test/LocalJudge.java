@@ -17,11 +17,11 @@ import static org.junit.jupiter.api.Assertions.*;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class LocalJudge {
 
-    private static String database = "localhost:5432/cslab1";
+    private static String database = "localhost:5432/postgres";
 
-    private static String root = "test";
+    private static String root = "postgres";
 
-    private static String pass = "123456";
+    private static String pass = "ljcfyh_123@99";
 
     private static String recordsCSV = "./data/records.csv";
 
@@ -247,7 +247,7 @@ public class LocalJudge {
      */
     @Test
     @Order(11)
-    @Timeout(value = 2000, unit = TimeUnit.MILLISECONDS)
+    @Timeout(value = 3000, unit = TimeUnit.MILLISECONDS)
     public void newItem() {
         Set<Map.Entry<List<Object>, Boolean>> entries = courierUserTest.newItem.entrySet();
         Set<Map.Entry<List<Object>, Boolean>> treeSet = new TreeSet<>((o1, o2) -> {
