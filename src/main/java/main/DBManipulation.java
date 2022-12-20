@@ -15,7 +15,11 @@ import main.interfaces.LogInfo.StaffType;
 public class DBManipulation implements IDatabaseManipulation {
 	
 	private String database, root, pass;
-	private Connection conn;
+	private Connection rootConn;
+	private Connection sustcManagerConn;
+	private Connection courierConn;;
+	private Connection seaportConn;
+	private Connection companyManagerConn;
 	
 	static {
 		try {
@@ -25,19 +29,27 @@ public class DBManipulation implements IDatabaseManipulation {
 			e.printStackTrace();
 		}
 	}
+	
+	private Connection createConnection(String database, String user, String pass) throws SQLException {
+		Properties properties = new Properties();
+		properties.setProperty("user", root);
+		properties.setProperty("password", pass);
+		properties.setProperty("useSSL", "false");
+		properties.setProperty("autoReconnect", "true");
+		return DriverManager.getConnection("jdbc:postgresql://" + database, user, pass);
+	}
+	
+	
 
 	public DBManipulation(String database, String root, String pass) {
 		this.database = database;
 		this.root = root;
 		this.pass = pass;
 		try {
-			Properties properties = new Properties();
-			properties.setProperty("user", root);
-			properties.setProperty("password", pass);
-			properties.setProperty("useSSL", "false");
-			properties.setProperty("autoReconnect", "true");
-			conn = DriverManager.getConnection("jdbc:postgresql://" + database, root, pass);
-			Statement sta = this.conn.createStatement();
+			this.rootConn = createConnection(database, root, pass);
+			
+			
+			Statement sta = this.rootConn.createStatement();
 			sta.executeUpdate("create table if not exists staff (" 
 					+ "    name varchar not null,"
 					+ "    password varchar not null," 
@@ -99,6 +111,21 @@ public class DBManipulation implements IDatabaseManipulation {
 					+ "alter table import_information add constraint foreignKey_importInformation_itemName foreign key (item_name) references item(name);"
 					+ "alter table ship add constraint foreignKey_ship_itemName foreign key (item_name) references item(name);"
 					+ "alter table container add constraint foreignKey_container_itemName foreign key (item_name) references item(name);");
+			
+			this.rootConn.createStatement().execute("DROP USER IF EXISTS cs307_ll_sustcm;"
+					+ "DROP USER IF EXISTS cs307_ll_courier;"
+					+ "DROP USER IF EXISTS cs307_ll_seaportm;"
+					+ "DROP USER IF EXISTS cs307_ll_companym;"
+					+ "CREATE USER cs307_ll_sustcm WITH PASSWORD '123456';"
+					+ "CREATE USER cs307_ll_courier WITH PASSWORD '123456';"
+					+ "CREATE USER cs307_ll_seaportm WITH PASSWORD '123456';"
+					+ "CREATE USER cs307_ll_companym WITH PASSWORD '123456';"
+					+ "GRANT SELECT ON staff, container, ship, item, import_information, export_information,  retrieval_information, delivery_information TO cs307_ll_sustcm;"
+					);
+			this.sustcManagerConn = createConnection(database, "cs307_ll_sustcm", "123456");
+			this.companyManagerConn = createConnection(database, "cs307_ll_companym", "123456");
+			this.seaportConn = createConnection(database, "cs307_ll_seaportm", "123456");
+			this.courierConn = createConnection(database, "cs307_ll_courier", "123456");
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
@@ -116,21 +143,21 @@ public class DBManipulation implements IDatabaseManipulation {
 	@Override
 	public void $import(String recordsCSV, String staffsCSV) {
 		try {
-			this.conn.prepareStatement("ALTER TABLE delivery_information DISABLE TRIGGER ALL").execute();
-			this.conn.prepareStatement("ALTER TABLE retrieval_information DISABLE TRIGGER ALL").execute();
-			this.conn.prepareStatement("ALTER TABLE export_information DISABLE TRIGGER ALL").execute();
-			this.conn.prepareStatement("ALTER TABLE import_information DISABLE TRIGGER ALL").execute();
-			this.conn.prepareStatement("ALTER TABLE ship DISABLE TRIGGER ALL").execute();
-			this.conn.prepareStatement("ALTER TABLE container DISABLE TRIGGER ALL").execute();
+			this.rootConn.prepareStatement("ALTER TABLE delivery_information DISABLE TRIGGER ALL").execute();
+			this.rootConn.prepareStatement("ALTER TABLE retrieval_information DISABLE TRIGGER ALL").execute();
+			this.rootConn.prepareStatement("ALTER TABLE export_information DISABLE TRIGGER ALL").execute();
+			this.rootConn.prepareStatement("ALTER TABLE import_information DISABLE TRIGGER ALL").execute();
+			this.rootConn.prepareStatement("ALTER TABLE ship DISABLE TRIGGER ALL").execute();
+			this.rootConn.prepareStatement("ALTER TABLE container DISABLE TRIGGER ALL").execute();
 			Scanner scanner = new Scanner(staffsCSV);
 			Scanner valueScanner = null;
-			this.conn.setAutoCommit(false);
+			this.rootConn.setAutoCommit(false);
 			int index = 0;
 			Calendar cal = Calendar.getInstance();
 			int currentYear = cal.get(Calendar.YEAR);
 			int birthYear = 0;
 			boolean gender = false;
-			PreparedStatement statement = conn.prepareStatement(staffSQL);
+			PreparedStatement statement = rootConn.prepareStatement(staffSQL);
 			scanner.nextLine();
 			while (scanner.hasNextLine()) {
 				valueScanner = new Scanner(scanner.nextLine());
@@ -192,13 +219,13 @@ public class DBManipulation implements IDatabaseManipulation {
 			scanner = new Scanner(recordsCSV);
 			valueScanner = null;
 			
-			PreparedStatement containerStatement = this.conn.prepareStatement(containerSQL);
-			PreparedStatement deliveryInformationStatement = this.conn.prepareStatement(deliveryInformationSQL);
-			PreparedStatement retrievalInformationStatement = this.conn.prepareStatement(retrievalInformationSQL);
-			PreparedStatement exportInformationStatement = this.conn.prepareStatement(exportInformationSQL);
-			PreparedStatement importInformationStatement = this.conn.prepareStatement(importInformationSQL);
-			PreparedStatement itemStatement = this.conn.prepareStatement(itemSQL);
-			PreparedStatement shipStatement = this.conn.prepareStatement(shipSQL);
+			PreparedStatement containerStatement = this.rootConn.prepareStatement(containerSQL);
+			PreparedStatement deliveryInformationStatement = this.rootConn.prepareStatement(deliveryInformationSQL);
+			PreparedStatement retrievalInformationStatement = this.rootConn.prepareStatement(retrievalInformationSQL);
+			PreparedStatement exportInformationStatement = this.rootConn.prepareStatement(exportInformationSQL);
+			PreparedStatement importInformationStatement = this.rootConn.prepareStatement(importInformationSQL);
+			PreparedStatement itemStatement = this.rootConn.prepareStatement(itemSQL);
+			PreparedStatement shipStatement = this.rootConn.prepareStatement(shipSQL);
 			scanner.nextLine();
 			int cnt = 0;
 			String data = null;
@@ -346,14 +373,14 @@ public class DBManipulation implements IDatabaseManipulation {
 			retrievalInformationStatement.executeBatch();
 			shipStatement.executeBatch();
 			
-			this.conn.prepareStatement("ALTER TABLE delivery_information ENABLE TRIGGER ALL").execute();
-			this.conn.prepareStatement("ALTER TABLE retrieval_information ENABLE TRIGGER ALL").execute();
-			this.conn.prepareStatement("ALTER TABLE export_information ENABLE TRIGGER ALL").execute();
-			this.conn.prepareStatement("ALTER TABLE import_information ENABLE TRIGGER ALL").execute();
-			this.conn.prepareStatement("ALTER TABLE ship ENABLE TRIGGER ALL").execute();
-			this.conn.prepareStatement("ALTER TABLE container ENABLE TRIGGER ALL").execute();
-			this.conn.commit();
-			this.conn.setAutoCommit(true);
+			this.rootConn.prepareStatement("ALTER TABLE delivery_information ENABLE TRIGGER ALL").execute();
+			this.rootConn.prepareStatement("ALTER TABLE retrieval_information ENABLE TRIGGER ALL").execute();
+			this.rootConn.prepareStatement("ALTER TABLE export_information ENABLE TRIGGER ALL").execute();
+			this.rootConn.prepareStatement("ALTER TABLE import_information ENABLE TRIGGER ALL").execute();
+			this.rootConn.prepareStatement("ALTER TABLE ship ENABLE TRIGGER ALL").execute();
+			this.rootConn.prepareStatement("ALTER TABLE container ENABLE TRIGGER ALL").execute();
+			this.rootConn.commit();
+			this.rootConn.setAutoCommit(true);
 			scanner.close();
 		} catch (SQLException e) {
 			e.printStackTrace();
@@ -365,35 +392,39 @@ public class DBManipulation implements IDatabaseManipulation {
 	
 	
 	private boolean checkUser(LogInfo logInfo) throws SQLException {
-		PreparedStatement statement = this.conn.prepareStatement(checkUserSQL);
+		PreparedStatement statement = this.rootConn.prepareStatement(checkUserSQL);
 		statement.setString(1, logInfo.name());
 		statement.setString(2, logInfo.password());
 		ResultSet rs = statement.executeQuery();
-		return rs.next();
+		if (!rs.next()) {
+			return false;
+		}
+		return getStaffTypeByDescription(rs.getString(3)) == logInfo.type();
 	}
 
 
 	//Company Manager User
-	private static final String getImportTaxRateSQL = "with\n" +
-			"    tmp1 as (select name, price from item where type = ?),\n" +
-			"    tmp2 as (select item_name, tax from import_information where city = ?)\n" +
-			"    select case (select count(*) from tmp1) when 0 then -1 else (\n" +
-			"       select case (select count(*) from tmp2) when 0 then -1 else (\n" +
-			"            select  sum(tax)/sum(price) as ImportTaxRate from (\n" +
-			"            select tmp1.name, tmp1.price, tmp2.tax from tmp1\n" +
-			"            inner join tmp2\n" +
-			"            on tmp1.name = tmp2.item_name) as foo\n" +
-			"       )\n" +
-			"       end\n" +
-			"    )\n" +
-			"    end\n";
+	private static final String getImportTaxRateSQL = "with" +
+			"    tmp1 as (select name, price from item where type = ?)," +
+			"    tmp2 as (select item_name, tax from import_information where city = ?)" +
+			"    select case (select count(*) from tmp1) when 0 then -1 else (" +
+			"       select case (select count(*) from tmp2) when 0 then -1 else (" +
+			"            select  sum(tax)/sum(price) as ImportTaxRate from (" +
+			"            select tmp1.name, tmp1.price, tmp2.tax from tmp1" +
+			"            inner join tmp2" +
+			"            on tmp1.name = tmp2.item_name) as foo" +
+			"       )" +
+			"       end" +
+			"    )" +
+			"    end";
 	@Override
 	public double getImportTaxRate(LogInfo logInfo, String city, String itemType) {
 		try {
-			if (logInfo.type() != StaffType.CompanyManager || !checkUser(logInfo)) {
+			if (!checkUser(logInfo)) {
 				return -1;
 			}
-			PreparedStatement statement = this.conn.prepareStatement(getImportTaxRateSQL);
+			Connection userConnection = getUserConnection(logInfo.type());
+			PreparedStatement statement = userConnection.prepareStatement(getImportTaxRateSQL);
 			statement.setString(1, itemType);
 			statement.setString(2, city);
 			ResultSet rs = statement.executeQuery();
@@ -403,34 +434,52 @@ public class DBManipulation implements IDatabaseManipulation {
 				return -1;
 			}
 		} catch (SQLException e) {
-			Main.getThrowableHandler().feedBackThrowable(e);
+			feedbackThrowable(e);
 		}
-		return 0;
+		return -1;
 	}
 	
+	private static void feedbackThrowable(Throwable e) {
+		
+	}
+	
+	private Connection getUserConnection(StaffType type) {
+		if (type == StaffType.CompanyManager) {
+			return this.companyManagerConn;
+		}
+		if (type == StaffType.SeaportOfficer) {
+			return this.seaportConn;
+		}
+		if (type == StaffType.Courier) {
+			return this.courierConn;
+		}
+		return this.sustcManagerConn;
+	}
+
 	//Company Manager User
 
 
-	private static final String getExportTaxRateSQL = "with\n" +
-			"    tmp1 as (select name, price from item where type = ?),\n" +
-			"    tmp2 as (select item_name, tax from export_information where city = ?)\n" +
-			"    select case (select count(*) from tmp1) when 0 then -1 else (\n" +
-			"       select case (select count(*) from tmp2) when 0 then -1 else (\n" +
-			"            select  sum(tax)/sum(price) as ExportTaxRate from (\n" +
-			"            select tmp1.name, tmp1.price, tmp2.tax from tmp1\n" +
-			"            inner join tmp2\n" +
-			"            on tmp1.name = tmp2.item_name) as foo\n" +
-			"       )\n" +
-			"       end\n" +
-			"    )\n" +
-			"    end\n";
+	private static final String getExportTaxRateSQL = "with" +
+			"    tmp1 as (select name, price from item where type = ?)," +
+			"    tmp2 as (select item_name, tax from export_information where city = ?)" +
+			"    select case (select count(*) from tmp1) when 0 then -1 else (" +
+			"       select case (select count(*) from tmp2) when 0 then -1 else (" +
+			"            select  sum(tax)/sum(price) as ExportTaxRate from (" +
+			"            select tmp1.name, tmp1.price, tmp2.tax from tmp1" +
+			"            inner join tmp2" +
+			"            on tmp1.name = tmp2.item_name) as foo" +
+			"       )" +
+			"       end" +
+			"    )" +
+			"    end";
 	@Override
 	public double getExportTaxRate(LogInfo logInfo, String city, String itemType) {
 		try {
-			if (logInfo.type() != StaffType.CompanyManager || !checkUser(logInfo)) {
+			if (!checkUser(logInfo)) {
 				return -1;
 			}
-			PreparedStatement statement = this.conn.prepareStatement(getExportTaxRateSQL);
+			Connection userConnection = getUserConnection(logInfo.type());
+			PreparedStatement statement = userConnection.prepareStatement(getExportTaxRateSQL);
 			statement.setString(1, itemType);
 			statement.setString(2, city);
 			ResultSet rs = statement.executeQuery();
@@ -440,15 +489,15 @@ public class DBManipulation implements IDatabaseManipulation {
 				return -1;
 			}
 		} catch (SQLException e) {
-			Main.getThrowableHandler().feedBackThrowable(e);
+			feedbackThrowable(e);
 		}
-		return 0;
+		return -1;
 	}
 	private static final String getItemContainerCode = "select code from container where item_name = ?";
 	private static final String checkContainerCode = "select case (select count(*) from container where code = ?) when 0 then false else true end";
-	private static final String checkPackingContainerSQL = "with\n" +
-			"    tmp1 as (select name from item where state = 'Packing to Container' or state = 'Shipping' or state = 'Unpacking from Container'),\n" +
-			"    tmp2 as (select item_name from container where code = ? and item_name != ?)\n" +
+	private static final String checkPackingContainerSQL = "with" +
+			"    tmp1 as (select name from item where state = 'Packing to Container' or state = 'Shipping' or state = 'Unpacking from Container')," +
+			"    tmp2 as (select item_name from container where code = ? and item_name != ?)" +
 			"    select case (select count(tmp1.name) from tmp1 inner join tmp2 on tmp1.name = tmp2.item_name) when 0 then true else false end";
 
 	private static final String getContainerTypeSQL = "select type from container where code = ?";
@@ -458,11 +507,12 @@ public class DBManipulation implements IDatabaseManipulation {
 	@Override
 	public boolean loadItemToContainer(LogInfo logInfo, String itemName, String containerCode) {
 		try {
-			if (logInfo.type() != StaffType.CompanyManager || !checkUser(logInfo)) {
+			if (!checkUser(logInfo)) {
 				return false;
 			}
+			Connection userConnection = getUserConnection(logInfo.type());
 			PreparedStatement statement; ResultSet rs;
-			statement = this.conn.prepareStatement(checkItemSQL);
+			statement = userConnection.prepareStatement(checkItemSQL);
 			statement.setString(1, itemName);
 			rs = statement.executeQuery();
 			if (rs.next()) {
@@ -470,17 +520,18 @@ public class DBManipulation implements IDatabaseManipulation {
 			} else {
 				return false;
 			}
-
-			statement = this.conn.prepareStatement(getItemStateSQL);
+			statement.close();
+			statement = userConnection.prepareStatement(getItemStateSQL);
 			statement.setString(1, itemName);
 
 			rs = statement.executeQuery();
 			if (rs.next()) {
-				if (!rs.getString(1).equals("Packing to Container")) return false;
+				if (!rs.getString(1).equals(getDescriptionByItemState(ItemState.PackingToContainer))) return false;
 			} else {
 				return false;
 			}
-			statement = this.conn.prepareStatement(getItemContainerCode);
+			statement.close();
+			statement = userConnection.prepareStatement(getItemContainerCode);
 			statement.setString(1, itemName);
 			rs = statement.executeQuery();
 			String nowContainerCode;
@@ -490,7 +541,7 @@ public class DBManipulation implements IDatabaseManipulation {
 				return false;
 			}
 
-			statement = this.conn.prepareStatement(checkContainerCode);
+			statement = userConnection.prepareStatement(checkContainerCode);
 			statement.setString(1, containerCode);
 			rs = statement.executeQuery();
 			if (rs.next()) {
@@ -500,7 +551,8 @@ public class DBManipulation implements IDatabaseManipulation {
 			}
 
 			if (nowContainerCode == null) {
-				statement = this.conn.prepareStatement(checkPackingContainerSQL);
+				statement.close();
+				statement = userConnection.prepareStatement(checkPackingContainerSQL);
 				statement.setString(1, containerCode);
 				statement.setNull(2, Types.VARCHAR);
 				rs = statement.executeQuery();
@@ -511,7 +563,8 @@ public class DBManipulation implements IDatabaseManipulation {
 				}
 
 				String containerType = null;
-				statement = this.conn.prepareStatement(getContainerTypeSQL);
+				statement.close();
+				statement = userConnection.prepareStatement(getContainerTypeSQL);
 				statement.setString(1, containerCode);
 				rs = statement.executeQuery();
 				if (rs.next()) {
@@ -519,18 +572,19 @@ public class DBManipulation implements IDatabaseManipulation {
 				} else {
 					return false;
 				}
-
-				statement = this.conn.prepareStatement(updateItemContainerCode);
+				statement.close();
+				statement = userConnection.prepareStatement(updateItemContainerCode);
 				statement.setString(1, containerCode);
 				statement.setString(2, containerType);
 				statement.setString(3, itemName);
 				statement.executeUpdate();
 
 			} else {
-
-				statement = this.conn.prepareStatement(checkPackingContainerSQL);
+				statement.close();
+				statement = userConnection.prepareStatement(checkPackingContainerSQL);
 				statement.setString(1, containerCode);
 				statement.setString(2, itemName);
+				rs.close();
 				rs = statement.executeQuery();
 				if (rs.next()) {
 					if (!rs.getBoolean(1)) return false;
@@ -539,7 +593,7 @@ public class DBManipulation implements IDatabaseManipulation {
 				}
 
 				String containerType = null;
-				statement = this.conn.prepareStatement(getContainerTypeSQL);
+				statement = userConnection.prepareStatement(getContainerTypeSQL);
 				statement.setString(1, containerCode);
 				rs = statement.executeQuery();
 				if (rs.next()) {
@@ -548,7 +602,7 @@ public class DBManipulation implements IDatabaseManipulation {
 					return false;
 				}
 
-				statement = this.conn.prepareStatement(updateItemContainerCode);
+				statement = userConnection.prepareStatement(updateItemContainerCode);
 				statement.setString(1, containerCode);
 				statement.setString(2, containerType);
 				statement.setString(3, itemName);
@@ -558,22 +612,22 @@ public class DBManipulation implements IDatabaseManipulation {
 
 			return true;
 		} catch (SQLException e) {
-			Main.getThrowableHandler().feedBackThrowable(e);
+			feedbackThrowable(e);
 		}
 		return false;
 	}
 	
 	//Company Manager User
-	private static final String getItemNameFromContainerCodeSQL = "with\n" +
-			"    tmp1 as (select item_name from container where code = ?),\n" +
-			"    tmp2 as (select name from item where state = 'Packing to Container')\n" +
+	private static final String getItemNameFromContainerCodeSQL = "with" +
+			"    tmp1 as (select item_name from container where code = ?)," +
+			"    tmp2 as (select name from item where state = 'Packing to Container')" +
 			"    select tmp1.item_name from tmp1 inner join tmp2 on tmp2.name = tmp1.item_name;";
-	private static final String checkShipSailing = "with\n" +
-			"    tmp1 as (select item_name from ship where ship_name = ?),\n" +
-			"    tmp2 as (select name from item where state = 'Shipping')\n" +
-			"    select case (select count(*) from tmp1) when 0 then false else (\n" +
-			"        select case (select count(tmp1.item_name) from tmp1 inner join tmp2 on tmp1.item_name = tmp2.name)\n" +
-			"        when 0 then true else false end\n" +
+	private static final String checkShipSailing = "with" +
+			"    tmp1 as (select item_name from ship where ship_name = ?)," +
+			"    tmp2 as (select name from item where state = 'Shipping')" +
+			"    select case (select count(*) from tmp1) when 0 then false else (" +
+			"        select case (select count(tmp1.item_name) from tmp1 inner join tmp2 on tmp1.item_name = tmp2.name)" +
+			"        when 0 then true else false end" +
 			"    ) end";
 	private static final String getShipCompany = "select company from ship where ship_name = ?";
 	private static final String getStaffCompany = "select company from staff where name = ?";
@@ -582,11 +636,12 @@ public class DBManipulation implements IDatabaseManipulation {
 	@Override
 	public boolean loadContainerToShip(LogInfo logInfo, String shipName, String containerCode) {
 		try {
-			if (logInfo.type() != StaffType.CompanyManager || !checkUser(logInfo)) {
+			if (!checkUser(logInfo)) {
 				return false;
 			}
+			Connection userConnection = getUserConnection(logInfo.type());
 			PreparedStatement statement; ResultSet rs;
-			statement = this.conn.prepareStatement(getItemNameFromContainerCodeSQL);
+			statement = userConnection.prepareStatement(getItemNameFromContainerCodeSQL);
 			statement.setString(1, containerCode);
 			rs = statement.executeQuery();
 			String itemName = null;
@@ -595,7 +650,7 @@ public class DBManipulation implements IDatabaseManipulation {
 			} else {
 				return false;
 			}
-			statement = this.conn.prepareStatement(getItemStateSQL);
+			statement = userConnection.prepareStatement(getItemStateSQL);
 			statement.setString(1, itemName);
 			rs = statement.executeQuery();
 			String itemState = null;
@@ -604,8 +659,8 @@ public class DBManipulation implements IDatabaseManipulation {
 			} else {
 				return false;
 			}
-			if (!itemState.equals("Packing to Container")) return false;
-			statement = this.conn.prepareStatement(checkShipSailing);
+			if (!itemState.equals(getDescriptionByItemState(ItemState.PackingToContainer))) return false;
+			statement = userConnection.prepareStatement(checkShipSailing);
 			statement.setString(1, shipName);
 			rs = statement.executeQuery();
 			if (rs.next()) {
@@ -614,7 +669,7 @@ public class DBManipulation implements IDatabaseManipulation {
 				return false;
 			}
 			String shipCompany = null;
-			statement = this.conn.prepareStatement(getShipCompany);
+			statement = userConnection.prepareStatement(getShipCompany);
 			statement.setString(1, shipName);
 			rs = statement.executeQuery();
 			if (rs.next()) {
@@ -623,7 +678,7 @@ public class DBManipulation implements IDatabaseManipulation {
 				return false;
 			}
 			String staffCompany = null;
-			statement = this.conn.prepareStatement(getStaffCompany);
+			statement = userConnection.prepareStatement(getStaffCompany);
 			statement.setString(1, logInfo.name());
 			rs = statement.executeQuery();
 			if (rs.next()) {
@@ -633,7 +688,7 @@ public class DBManipulation implements IDatabaseManipulation {
 			}
 			if (!shipCompany.equals(staffCompany)) return false;
 			String itemCompany = null;
-			statement = this.conn.prepareStatement(getItemCompany);
+			statement = userConnection.prepareStatement(getItemCompany);
 			statement.setString(1, itemName);
 			rs = statement.executeQuery();
 			if (rs.next()) {
@@ -642,35 +697,36 @@ public class DBManipulation implements IDatabaseManipulation {
 				return false;
 			}
 			if (!itemCompany.equals(staffCompany)) return false;
-			statement = this.conn.prepareStatement(updateItemState);
-			statement.setString(1, "Waiting for Shipping");
+			statement = userConnection.prepareStatement(updateItemState);
+			statement.setString(1, getDescriptionByItemState(ItemState.WaitingForShipping));
 			statement.setString(2, itemName);
 			statement.executeUpdate();
 
-			statement = this.conn.prepareStatement(updateItemShip);
+			statement = userConnection.prepareStatement(updateItemShip);
 			statement.setString(1, shipName);
 			statement.setString(2, itemName);
 			statement.executeUpdate();
 			return true;
 		} catch (SQLException e) {
-			Main.getThrowableHandler().feedBackThrowable(e);
+			feedbackThrowable(e);
 		}
 		return false;
 	}
 	
 	//Company Manager User
-	private static final String getWaitingShippingItems = "with\n" +
-			"    tmp1 as (select item_name from ship where ship_name = ? and company = ?),\n" +
-			"    tmp2 as (select name from item where state = 'Waiting for Shipping')\n" +
+	private static final String getWaitingShippingItems = "with" +
+			"    tmp1 as (select item_name from ship where ship_name = ? and company = ?)," +
+			"    tmp2 as (select name from item where state = 'Waiting for Shipping')" +
 			"    select tmp1.item_name from tmp1 inner join tmp2 on tmp2.name = tmp1.item_name";
 	@Override
 	public boolean shipStartSailing(LogInfo logInfo, String shipName) {
 		try {
-			if (logInfo.type() != StaffType.CompanyManager || !checkUser(logInfo)) {
+			if (!checkUser(logInfo)) {
 				return false;
 			}
+			Connection userConnection = getUserConnection(logInfo.type());
 			PreparedStatement statement; ResultSet rs;
-			statement = this.conn.prepareStatement(checkShipSailing);
+			statement = userConnection.prepareStatement(checkShipSailing);
 			statement.setString(1, shipName);
 			rs = statement.executeQuery();
 			if (rs.next()) {
@@ -678,7 +734,7 @@ public class DBManipulation implements IDatabaseManipulation {
 			} else {
 				return false;
 			}
-			statement = this.conn.prepareStatement(getStaffCompany);
+			statement = userConnection.prepareStatement(getStaffCompany);
 			statement.setString(1, logInfo.name());
 			rs = statement.executeQuery();
 			String staffCompany = null;
@@ -687,7 +743,7 @@ public class DBManipulation implements IDatabaseManipulation {
 			} else {
 				return false;
 			}
-			statement = this.conn.prepareStatement(getWaitingShippingItems);
+			statement = userConnection.prepareStatement(getWaitingShippingItems);
 			statement.setString(1, shipName);
 			statement.setString(2, staffCompany);
 			rs = statement.executeQuery();
@@ -700,14 +756,14 @@ public class DBManipulation implements IDatabaseManipulation {
 				return false;
 			}
 			for (String item : list) {
-				statement = this.conn.prepareStatement(updateItemState);
-				statement.setString(1, "Shipping");
+				statement = userConnection.prepareStatement(updateItemState);
+				statement.setString(1, getDescriptionByItemState(ItemState.Shipping));
 				statement.setString(2, item);
 				statement.executeUpdate();
 			}
 			return true;
 		} catch (SQLException e) {
-			Main.getThrowableHandler().feedBackThrowable(e);
+			feedbackThrowable(e);
 		}
 		return false;
 	}
@@ -716,25 +772,26 @@ public class DBManipulation implements IDatabaseManipulation {
 	@Override
 	public boolean unloadItem(LogInfo logInfo, String item) {
 		try {
-			if (logInfo.type() != StaffType.CompanyManager || !checkUser(logInfo)) {
+			if (!checkUser(logInfo)) {
 				return false;
 			}
+			Connection userConnection = getUserConnection(logInfo.type());
 			PreparedStatement statement; ResultSet rs;
-			statement = this.conn.prepareStatement(getItemStateSQL);
+			statement = userConnection.prepareStatement(getItemStateSQL);
 			statement.setString(1, item);
 			rs = statement.executeQuery();
 			if (rs.next()) {
-				if (!rs.getString(1).equals("Shipping")) return false;
+				if (!rs.getString(1).equals(getDescriptionByItemState(ItemState.Shipping))) return false;
 			} else {
 				return false;
 			}
-			statement = this.conn.prepareStatement(updateItemState);
-			statement.setString(1, "Unpacking from Container");
+			statement = userConnection.prepareStatement(updateItemState);
+			statement.setString(1, getDescriptionByItemState(ItemState.UnpackingFromContainer));
 			statement.setString(2, item);
 			statement.executeUpdate();
 			return true;
 		} catch (SQLException e) {
-			Main.getThrowableHandler().feedBackThrowable(e);
+			feedbackThrowable(e);
 		}
 		return false;
 	}
@@ -743,25 +800,26 @@ public class DBManipulation implements IDatabaseManipulation {
 	@Override
 	public boolean itemWaitForChecking(LogInfo logInfo, String item) {
 		try {
-			if (logInfo.type() != StaffType.CompanyManager || !checkUser(logInfo)) {
+			if (!checkUser(logInfo)) {
 				return false;
 			}
+			Connection userConnection = getUserConnection(logInfo.type());
 			PreparedStatement statement; ResultSet rs;
-			statement = this.conn.prepareStatement(getItemStateSQL);
+			statement = userConnection.prepareStatement(getItemStateSQL);
 			statement.setString(1, item);
 			rs = statement.executeQuery();
 			if (rs.next()) {
-				if (!rs.getString(1).equals("Unpacking from Container")) return false;
+				if (!rs.getString(1).equals(getDescriptionByItemState(ItemState.UnpackingFromContainer))) return false;
 			} else {
 				return false;
 			}
-			statement = this.conn.prepareStatement(updateItemState);
-			statement.setString(1, "Import Checking");
+			statement = userConnection.prepareStatement(updateItemState);
+			statement.setString(1, getDescriptionByItemState(ItemState.ImportChecking));
 			statement.setString(2, item);
 			statement.executeUpdate();
 			return true;
 		} catch (SQLException e) {
-			Main.getThrowableHandler().feedBackThrowable(e);
+			feedbackThrowable(e);
 		}
 		return false;
 	}
@@ -786,23 +844,23 @@ public class DBManipulation implements IDatabaseManipulation {
 		}
 	}
 	//Courier User
-	private static final String checkItemSQL = "select case (select count(*) from item where name = ?)\n" +
-			"    when 0 then true\n" +
-			"    else false\n" +
-			"end\n";
+	private static final String checkItemSQL = "select case (select count(*) from item where name = ?)" +
+			"    when 0 then true" +
+			"    else false" +
+			"end";
 	private static final String checkContainerSQL = "select * from container where item_name = ?";
 	private static final String checkShipSQL = "select * from ship where item_name = ?";
 
-	private static final String checkStaffCity = "select case (select count(*) from staff where name = ? and city = ?)\n" +
-			"	when 0 then false\n" +
-			"	else true\n" +
-			"end\n";
+	private static final String checkStaffCity = "select case (select count(*) from staff where name = ? and city = ?)" +
+			"	when 0 then false" +
+			"	else true" +
+			"end";
 
-	public boolean checkItem(ItemInfo itemInfo, boolean isNewItem, String retrievalCourier) {
+	public boolean checkItem(ItemInfo itemInfo, boolean isNewItem, String retrievalCourier, Connection userConnection) {
 		if (itemInfo == null) return false;
 		try {
 			PreparedStatement statement;
-			statement = this.conn.prepareStatement(checkItemSQL);
+			statement = userConnection.prepareStatement(checkItemSQL);
 			statement.setString(1, itemInfo.name());
 			ResultSet rs = statement.executeQuery();
 			if (rs.next()) {
@@ -821,7 +879,7 @@ public class DBManipulation implements IDatabaseManipulation {
 				if (itemInfo.retrieval().city() == null) return false;
 				if (itemInfo.retrieval().courier() != null && !itemInfo.retrieval().courier().equals(retrievalCourier))
 					return false;
-				statement = this.conn.prepareStatement(checkStaffCity);
+				statement = userConnection.prepareStatement(checkStaffCity);
 				statement.setString(1, retrievalCourier);
 				statement.setString(2, itemInfo.retrieval().city());
 				rs = statement.executeQuery();
@@ -834,7 +892,7 @@ public class DBManipulation implements IDatabaseManipulation {
 			if (itemInfo.delivery().city() == null) return false;
 			if (itemInfo.delivery().courier() == null && stateToInt(itemInfo.state()) >= 11) return false;
 			if (itemInfo.delivery().courier() != null) {
-				statement = this.conn.prepareStatement(checkStaffCity);
+				statement = userConnection.prepareStatement(checkStaffCity);
 				statement.setString(1, itemInfo.delivery().courier());
 				statement.setString(2, itemInfo.delivery().city());
 				rs = statement.executeQuery();
@@ -847,7 +905,7 @@ public class DBManipulation implements IDatabaseManipulation {
 			if (itemInfo.export().city() == null) return false;
 			if (itemInfo.export().officer() == null && stateToInt(itemInfo.state()) >= 3) return false;
 			if (itemInfo.export().officer() != null) {
-				statement = this.conn.prepareStatement(checkStaffCity);
+				statement = userConnection.prepareStatement(checkStaffCity);
 				statement.setString(1, itemInfo.export().officer());
 				statement.setString(2, itemInfo.export().city());
 				rs = statement.executeQuery();
@@ -860,7 +918,7 @@ public class DBManipulation implements IDatabaseManipulation {
 			if (itemInfo.$import().city() == null) return false;
 			if (itemInfo.$import().officer() == null && stateToInt(itemInfo.state()) >= 9) return false;
 			if (itemInfo.$import().officer() != null) {
-				statement = this.conn.prepareStatement(checkStaffCity);
+				statement = userConnection.prepareStatement(checkStaffCity);
 				statement.setString(1, itemInfo.$import().officer());
 				statement.setString(2, itemInfo.$import().city());
 				rs = statement.executeQuery();
@@ -874,7 +932,7 @@ public class DBManipulation implements IDatabaseManipulation {
 			double exportTaxRate = itemInfo.export().tax() / itemInfo.price();
 			double importTaxRate = itemInfo.$import().tax() / itemInfo.price();
 
-			statement = this.conn.prepareStatement(getImportTaxRateSQL);
+			statement = userConnection.prepareStatement(getImportTaxRateSQL);
 			statement.setString(1, itemInfo.$class());
 			statement.setString(2, itemInfo.$import().city());
 			rs = statement.executeQuery();
@@ -884,7 +942,7 @@ public class DBManipulation implements IDatabaseManipulation {
 			} else {
 				return false;
 			}
-			statement = this.conn.prepareStatement(getExportTaxRateSQL);
+			statement = userConnection.prepareStatement(getExportTaxRateSQL);
 			statement.setString(1, itemInfo.$class());
 			statement.setString(2, itemInfo.export().city());
 			rs = statement.executeQuery();
@@ -896,7 +954,7 @@ public class DBManipulation implements IDatabaseManipulation {
 			}
 
 			String containerCode = null, containerType = null;
-			statement = this.conn.prepareStatement(checkContainerSQL);
+			statement = userConnection.prepareStatement(checkContainerSQL);
 			statement.setString(1, itemInfo.name());
 			rs = statement.executeQuery();
 			if (rs.next()) {
@@ -909,7 +967,7 @@ public class DBManipulation implements IDatabaseManipulation {
 				if (stateToInt(itemInfo.state()) >= 5) return false;
 			}
 			String shipName = null, company = null;
-			statement = this.conn.prepareStatement(checkShipSQL);
+			statement = userConnection.prepareStatement(checkShipSQL);
 			statement.setString(1, itemInfo.name());
 			rs = statement.executeQuery();
 			if (rs.next()) {
@@ -934,37 +992,38 @@ public class DBManipulation implements IDatabaseManipulation {
 	@Override
 	public boolean newItem(LogInfo logInfo, ItemInfo itemInfo) {
 		try {
-			if (logInfo.type() != StaffType.Courier || !checkUser(logInfo)) {
+			if (!checkUser(logInfo)) {
 				return false;
 			}
-			if (checkItem(itemInfo, true, logInfo.name()) == false) return false;
-			if (stateToInt(itemInfo.state()) > 1) return false;
+			Connection userConnection = getUserConnection(logInfo.type());
+			if (checkItem(itemInfo, true, logInfo.name(), userConnection) == false) {
+				return false;
+			}
+			if (stateToInt(itemInfo.state()) > 1) {
+				return false;
+			}
 			PreparedStatement statement;
-			statement = this.conn.prepareStatement(insertNewItemSQL5);
+			statement = userConnection.prepareStatement(insertNewItemSQL5);
 			statement.setString(1, itemInfo.name());
 			statement.setString(2, itemInfo.$class());
 			statement.setDouble(3, itemInfo.price());
 			statement.setString(4, "Picking-up");
 			statement.execute();
-
-			statement = this.conn.prepareStatement(insertNewItemSQL2);
+			
+			statement.close();
+			statement = userConnection.prepareStatement(insertNewItemSQL2);
 			statement.setString(1, itemInfo.name());
-			if (itemInfo == null) {
+			if (itemInfo.delivery().city() != null)
+				statement.setString(2, itemInfo.delivery().city());
+			else
 				statement.setNull(2, Types.VARCHAR);
+			if (itemInfo.delivery().courier() != null)
+				statement.setString(3, itemInfo.delivery().courier());
+			else
 				statement.setNull(3, Types.VARCHAR);
-			} else {
-				if (itemInfo.delivery().city() != null)
-					statement.setString(2, itemInfo.delivery().city());
-				else
-					statement.setNull(2, Types.VARCHAR);
-				if (itemInfo.delivery().courier() != null)
-					statement.setString(3, itemInfo.delivery().courier());
-				else
-					statement.setNull(3, Types.VARCHAR);
-			}
 			statement.execute();
 
-			statement = this.conn.prepareStatement(insertNewItemSQL3);
+			statement = userConnection.prepareStatement(insertNewItemSQL3);
 			statement.setString(1, itemInfo.name());
 
 			if (itemInfo.export().city() != null) statement.setString(2, itemInfo.export().city());
@@ -975,7 +1034,7 @@ public class DBManipulation implements IDatabaseManipulation {
 			statement.execute();
 
 
-			statement = this.conn.prepareStatement(insertNewItemSQL4);
+			statement = userConnection.prepareStatement(insertNewItemSQL4);
 			statement.setString(1, itemInfo.name());
 
 			statement.setString(2, itemInfo.$import().city());
@@ -988,7 +1047,7 @@ public class DBManipulation implements IDatabaseManipulation {
 
 
 
-			statement = this.conn.prepareStatement(insertNewItemSQL6);
+			statement = userConnection.prepareStatement(insertNewItemSQL6);
 			statement.setString(1, itemInfo.name());
 			statement.setString(2, itemInfo.retrieval().city());
 			statement.setString(3, logInfo.name());
@@ -996,45 +1055,30 @@ public class DBManipulation implements IDatabaseManipulation {
 
 			return true;
 		} catch (SQLException e) {
-			Main.getThrowableHandler().feedBackThrowable(e);
+			feedbackThrowable(e);
 		}
 
 		return false;
 	}
 
 	//Courier User
-	private ItemState stringToItemState(String s) {
-		if (s.equals("Delivering")) return ItemState.Delivering;
-		else if (s.equals("Export Check Fail")) return ItemState.ExportCheckFailed;
-		else if (s.equals("Export Checking")) return ItemState.ExportChecking;
-		else if (s.equals("Finish")) return ItemState.Finish;
-		else if (s.equals("From-Import Transporting")) return ItemState.FromImportTransporting;
-		else if (s.equals("Import Check Fail")) return ItemState.ImportCheckFailed;
-		else if (s.equals("Import Checking")) return ItemState.ImportChecking;
-		else if (s.equals("Packing to Container")) return ItemState.PackingToContainer;
-		else if (s.equals("Picking-up")) return ItemState.PickingUp;
-		else if (s.equals("Shipping")) return ItemState.Shipping;
-		else if (s.equals("To-Export Transporting")) return ItemState.ToExportTransporting;
-		else if (s.equals("Unpacking from Container")) return ItemState.UnpackingFromContainer;
-		else if (s.equals("Waiting for Shipping")) return ItemState.WaitingForShipping;
-		return null;
-	}
+	
 	private static final String getItemStateSQL = "select state from item where name = ?";
 	private static final String getItemRetrievalCourier = "select staff_name from retrieval_information where item_name = ?";
 	private static final String getItemDeliveryCourierAndCity = "select staff_name, city from delivery_information where item_name = ?";
 	private static final String updateItemState = "update item set state = ? where name = ?";
 	private static final String updateItemDeliveryCourier = "update delivery_information set staff_name = ? where item_name = ?";
-	private static final String checkItemDeliveryCourier = "select case \n" +
-			"(select count(*) from staff where name = ? and city = ?) when 0 then false\n" +
+	private static final String checkItemDeliveryCourier = "select case " +
+			"(select count(*) from staff where name = ? and city = ?) when 0 then false" +
 			"else true end";
 	@Override
 	public boolean setItemState(LogInfo logInfo, String name, ItemState s) {
 		try {
-			PreparedStatement statement;
-			if (logInfo.type() != StaffType.Courier || !checkUser(logInfo)) {
+			if (!checkUser(logInfo)) {
 				return false;
 			}
-			statement = this.conn.prepareStatement(checkItemSQL);
+			Connection userConnection = getUserConnection(logInfo.type());
+			PreparedStatement statement = userConnection.prepareStatement(checkItemSQL);
 			statement.setString(1, name);
 			ResultSet rs = statement.executeQuery();
 			if (rs.next()) {
@@ -1042,7 +1086,8 @@ public class DBManipulation implements IDatabaseManipulation {
 			} else {
 				return false;
 			}
-			statement = this.conn.prepareStatement(getItemStateSQL);
+			statement.close();
+			statement = userConnection.prepareStatement(getItemStateSQL);
 			statement.setString(1, name);
 			rs = statement.executeQuery();
 			String state = null;
@@ -1051,9 +1096,10 @@ public class DBManipulation implements IDatabaseManipulation {
 			} else {
 				return false;
 			}
-			if (state.equals("Picking-up")) {
+			if (state.equals(getDescriptionByItemState(ItemState.PickingUp))) {
 				String RetrievalCourier = null;
-				statement = this.conn.prepareStatement(getItemRetrievalCourier);
+				statement.close();
+				statement = userConnection.prepareStatement(getItemRetrievalCourier);
 				statement.setString(1, name);
 				rs = statement.executeQuery();
 				if (rs.next()) {
@@ -1061,46 +1107,50 @@ public class DBManipulation implements IDatabaseManipulation {
 					if (RetrievalCourier == null) return false;
 					if (!RetrievalCourier.equals(logInfo.name())) return false;
 					if (s != ItemState.ToExportTransporting) return false;
-					statement = this.conn.prepareStatement(updateItemState);
+					statement = userConnection.prepareStatement(updateItemState);
 					statement.setString(1, "To-Export Transporting");
 					statement.setString(2, name);
 					statement.executeUpdate();
 				} else {
 					return false;
 				}
-			} else if (state.equals("To-Export Transporting")) {
+			} else if (state.equals(getDescriptionByItemState(ItemState.ToExportTransporting))) {
 				String RetrievalCourier = null;
-				statement = this.conn.prepareStatement(getItemRetrievalCourier);
+				statement.close();
+				statement = userConnection.prepareStatement(getItemRetrievalCourier);
 				statement.setString(1, name);
+				rs.close();
 				rs = statement.executeQuery();
 				if (rs.next()) {
 					RetrievalCourier = rs.getString(1);
 					if (RetrievalCourier == null) return false;
 					if (!RetrievalCourier.equals(logInfo.name())) return false;
 					if (s != ItemState.ExportChecking) return false;
-					statement = this.conn.prepareStatement(updateItemState);
+					statement = userConnection.prepareStatement(updateItemState);
 					statement.setString(1, "Export Checking");
 					statement.setString(2, name);
 					statement.executeUpdate();
 				} else {
 					return false;
 				}
-			} else if (state.equals("From-Import Transporting")) {
+			} else if (state.equals(getDescriptionByItemState(ItemState.FromImportTransporting))) {
 				String deliveryCourier = null, deliveryCity = null;
-				statement = this.conn.prepareStatement(getItemDeliveryCourierAndCity);
+				statement.close();
+				statement = userConnection.prepareStatement(getItemDeliveryCourierAndCity);
 				statement.setString(1, name);
+				rs.close();
 				rs = statement.executeQuery();
 				if (rs.next()) {
 					deliveryCourier = rs.getString(1);
 					deliveryCity = rs.getString(2);
 					if (deliveryCourier == null) {
-						statement = this.conn.prepareStatement(checkItemDeliveryCourier);
+						statement = userConnection.prepareStatement(checkItemDeliveryCourier);
 						statement.setString(1, logInfo.name());
 						statement.setString(2, deliveryCity);
 						rs = statement.executeQuery();
 						if (rs.next()) {
 							if (rs.getBoolean(1) == false) return false;
-							statement = this.conn.prepareStatement(updateItemDeliveryCourier);
+							statement = userConnection.prepareStatement(updateItemDeliveryCourier);
 							statement.setString(1, logInfo.name());
 							statement.setString(2, name);
 							statement.executeUpdate();
@@ -1110,7 +1160,8 @@ public class DBManipulation implements IDatabaseManipulation {
 					} else {
 						if (!logInfo.name().equals(deliveryCourier)) return false;
 						if (s != ItemState.Delivering) return false;
-						statement = this.conn.prepareStatement(updateItemState);
+						statement.close();
+						statement = userConnection.prepareStatement(updateItemState);
 						statement.setString(1, "Delivering");
 						statement.setString(2, name);
 						statement.executeUpdate();
@@ -1118,18 +1169,20 @@ public class DBManipulation implements IDatabaseManipulation {
 				} else {
 					return false;
 				}
-			} else if (state.equals("Delivering")) {
+			} else if (state.equals(getDescriptionByItemState(ItemState.Delivering))) {
 				String deliveryCourier = null;
-				statement = this.conn.prepareStatement(getItemDeliveryCourierAndCity);
+				statement.close();
+				statement = userConnection.prepareStatement(getItemDeliveryCourierAndCity);
 				statement.setString(1, name);
+				rs.close();
 				rs = statement.executeQuery();
 				if (rs.next()) {
 					deliveryCourier = rs.getString(1);
 					if (deliveryCourier == null) return false;
 					if (!deliveryCourier.equals(logInfo.name())) return false;
 					if (s != ItemState.Finish) return false;
-					statement = this.conn.prepareStatement(updateItemState);
-					statement.setString(1, "Finish");
+					statement = userConnection.prepareStatement(updateItemState);
+					statement.setString(1, getDescriptionByItemState(ItemState.Finish));
 					statement.setString(2, name);
 					statement.executeUpdate();
 				} else {
@@ -1140,7 +1193,7 @@ public class DBManipulation implements IDatabaseManipulation {
 			}
 			return true;
 		} catch (SQLException e) {
-			Main.getThrowableHandler().feedBackThrowable(e);
+			feedbackThrowable(e);
 		}
 
 		return false;
@@ -1148,21 +1201,22 @@ public class DBManipulation implements IDatabaseManipulation {
 	
 	//Seaport Officer User
 	private static final String getStaffCity = "select city from staff where name = ?";
-	private static final String getItemAtPort = "(select name from item where state = 'Import Checking'\n" +
-			"INTERSECT (select item_name from import_information where city = ?))\n" +
-			"union\n" +
-			"(select name from item where state = 'Export Checking'\n" +
+	private static final String getItemAtPort = "(select name from item where state = 'Import Checking'" +
+			"INTERSECT (select item_name from import_information where city = ?))" +
+			"union" +
+			"(select name from item where state = 'Export Checking'" +
 			"INTERSECT (select item_name from export_information where city = ?))";
 	@Override
 	public String[] getAllItemsAtPort(LogInfo logInfo) {
 		try {
-			if (logInfo.type() != StaffType.SeaportOfficer || !checkUser(logInfo)) {
+			if (!checkUser(logInfo)) {
 				return new String[0];
 			}
+			Connection userConnection = getUserConnection(logInfo.type());
 			List<String> res = new ArrayList<>();
 
 			PreparedStatement statement; ResultSet rs;
-			statement = this.conn.prepareStatement(getStaffCity);
+			statement = userConnection.prepareStatement(getStaffCity);
 			statement.setString(1, logInfo.name());
 			rs = statement.executeQuery();
 
@@ -1174,7 +1228,7 @@ public class DBManipulation implements IDatabaseManipulation {
 				return new String[0];
 			}
 
-			statement = this.conn.prepareStatement(getItemAtPort);
+			statement = userConnection.prepareStatement(getItemAtPort);
 			statement.setString(1, staffCity);
 			statement.setString(2, staffCity);
 			rs = statement.executeQuery();
@@ -1192,7 +1246,7 @@ public class DBManipulation implements IDatabaseManipulation {
 			}
 			return ans;
 		} catch (SQLException e) {
-			Main.getThrowableHandler().feedBackThrowable(e);
+			feedbackThrowable(e);
 		}
 		return new String[0];
 	}
@@ -1205,24 +1259,24 @@ public class DBManipulation implements IDatabaseManipulation {
 	@Override
 	public boolean setItemCheckState(LogInfo logInfo, String itemName, boolean success) {
 		try {
-			if (logInfo.type() != StaffType.SeaportOfficer || !checkUser(logInfo)) {
+			if (!checkUser(logInfo)) {
 				return false;
 			}
-			PreparedStatement statement; ResultSet rs;
-			statement = this.conn.prepareStatement(getItemStateSQL);
+			Connection userConnection = getUserConnection(logInfo.type());
+			PreparedStatement statement = userConnection.prepareStatement(getItemStateSQL);
 			statement.setString(1, itemName);
-			rs = statement.executeQuery();
-			String nowItemState = null;
+			ResultSet rs = statement.executeQuery();
+			String currentItemState = null;
 			if (rs.next()) {
-				nowItemState = rs.getString(1);
+				currentItemState = rs.getString(1);
 			} else {
 				return false;
 			}
-			if (nowItemState.equals("Export Checking")) {
-				statement = this.conn.prepareStatement(getItemExportStaff);
-				statement.setString(1, itemName);
+			if (currentItemState.equals(getDescriptionByItemState(ItemState.ExportChecking))) {
+				PreparedStatement staffStatement = userConnection.prepareStatement(getItemExportStaff);
+				staffStatement.setString(1, itemName);
 				String itemStaff = null;
-				rs = statement.executeQuery();
+				rs = staffStatement.executeQuery();
 				if (rs.next()) {
 					itemStaff = rs.getString(1);
 				} else {
@@ -1232,29 +1286,30 @@ public class DBManipulation implements IDatabaseManipulation {
 				if (itemStaff != null && !itemStaff.equals(logInfo.name())) return false;
 
 				if (success) {
-					statement = this.conn.prepareStatement(updateItemState);
-					statement.setString(1, "Packing to Container");
-					statement.setString(2, itemName);
-					statement.execute();
+					PreparedStatement updateStatement = userConnection.prepareStatement(updateItemState);
+					updateStatement.setString(1, getDescriptionByItemState(ItemState.PackingToContainer));
+					updateStatement.setString(2, itemName);
+					updateStatement.execute();
 				} else {
-					statement = this.conn.prepareStatement(updateItemState);
-					statement.setString(1, "Export Check Fail");
-					statement.setString(2, itemName);
-					statement.execute();
+					PreparedStatement updateStatement = userConnection.prepareStatement(updateItemState);
+					updateStatement.setString(1, getDescriptionByItemState(ItemState.ExportCheckFailed));
+					updateStatement.setString(2, itemName);
+					updateStatement.execute();
 				}
 
 				if (itemStaff == null) {
-					statement = this.conn.prepareStatement(updateItemExportStaff);
-					statement.setString(1, logInfo.name());
-					statement.setString(2, itemName);
-					statement.execute();
+					PreparedStatement updateStatement = userConnection.prepareStatement(updateItemExportStaff);
+					updateStatement.setString(1, logInfo.name());
+					updateStatement.setString(2, itemName);
+					updateStatement.execute();
 				}
 
-			} else if (nowItemState.equals("Import Checking")) {
-				statement = this.conn.prepareStatement(getItemImportStaff);
-				statement.setString(1, itemName);
+			} else if (currentItemState.equals(getDescriptionByItemState(ItemState.ImportChecking))) {
+				PreparedStatement importStatement = userConnection.prepareStatement(getItemImportStaff);
+				importStatement.setString(1, itemName);
 				String itemStaff = null;
-				rs = statement.executeQuery();
+				rs.close();
+				rs = importStatement.executeQuery();
 				if (rs.next()) {
 					itemStaff = rs.getString(1);
 				} else {
@@ -1264,29 +1319,29 @@ public class DBManipulation implements IDatabaseManipulation {
 				if (itemStaff != null && !itemStaff.equals(logInfo.name())) return false;
 
 				if (success) {
-					statement = this.conn.prepareStatement(updateItemState);
-					statement.setString(1, "From-Import Transporting");
-					statement.setString(2, itemName);
-					statement.execute();
+					PreparedStatement updateStatement = userConnection.prepareStatement(updateItemState);
+					updateStatement.setString(1, getDescriptionByItemState(ItemState.FromImportTransporting));
+					updateStatement.setString(2, itemName);
+					updateStatement.execute();
 				} else {
-					statement = this.conn.prepareStatement(updateItemState);
-					statement.setString(1, "Import Check Fail");
-					statement.setString(2, itemName);
-					statement.execute();
+					PreparedStatement updateStatement = userConnection.prepareStatement(updateItemState);
+					updateStatement.setString(1, getDescriptionByItemState(ItemState.ImportCheckFailed));
+					updateStatement.setString(2, itemName);
+					updateStatement.execute();
 				}
 
 				if (itemStaff == null) {
-					statement = this.conn.prepareStatement(updateItemImportStaff);
-					statement.setString(1, logInfo.name());
-					statement.setString(2, itemName);
-					statement.execute();
+					PreparedStatement updateStatement = userConnection.prepareStatement(updateItemImportStaff);
+					updateStatement.setString(1, logInfo.name());
+					updateStatement.setString(2, itemName);
+					updateStatement.execute();
 				}
 			} else {
 				return false;
 			}
 			return true;
 		} catch (SQLException e) {
-			Main.getThrowableHandler().feedBackThrowable(e);
+			feedbackThrowable(e);
 		}
 		return false;
 	}
@@ -1297,11 +1352,11 @@ public class DBManipulation implements IDatabaseManipulation {
 	@Override
 	public int getCompanyCount(LogInfo logInfo) {
 		try {
-			if (logInfo.type() != StaffType.SustcManager || !checkUser(logInfo)) {
+			if (!checkUser(logInfo)) {
 				return -1;
 			}
-			
-			PreparedStatement statement = this.conn.prepareStatement(getCompanyCountSQL);
+			Connection userConnection = getUserConnection(logInfo.type());
+			PreparedStatement statement = userConnection.prepareStatement(getCompanyCountSQL);
 			ResultSet rs = statement.executeQuery();
 			if (rs.next()) {
 				return rs.getInt(1);
@@ -1309,27 +1364,27 @@ public class DBManipulation implements IDatabaseManipulation {
 				return 0;
 			}
 		} catch (SQLException e) {
-			Main.getThrowableHandler().feedBackThrowable(e);
+			feedbackThrowable(e);
 		}
 		return -1;
 	}
 	
-	private static final String getCityCountSQL = "SELECT count(*) from (\r\n"
-			+ "    SELECT DISTINCT city FROM (\r\n"
-			+ "        SELECT DISTINCT city FROM retrieval_information UNION DISTINCT\r\n"
-			+ "        (SELECT DISTINCT city FROM delivery_information) UNION DISTINCT\r\n"
-			+ "        (SELECT DISTINCT city FROM export_information) UNION DISTINCT\r\n"
-			+ "        (SELECT DISTINCT city from import_information)\r\n"
+	private static final String getCityCountSQL = "SELECT count(*) from ("
+			+ "    SELECT DISTINCT city FROM ("
+			+ "        SELECT DISTINCT city FROM retrieval_information UNION DISTINCT"
+			+ "        (SELECT DISTINCT city FROM delivery_information) UNION DISTINCT"
+			+ "        (SELECT DISTINCT city FROM export_information) UNION DISTINCT"
+			+ "        (SELECT DISTINCT city from import_information)"
 			+ "        )t1)t0;";
 	//SUSTC Department Manager User
 	@Override
 	public int getCityCount(LogInfo logInfo) {
 		try {
-			if (logInfo.type() != StaffType.SustcManager || !checkUser(logInfo)) {
+			if (!checkUser(logInfo)) {
 				return -1;
 			}
-			
-			PreparedStatement statement = this.conn.prepareStatement(getCityCountSQL);
+			Connection userConnection = getUserConnection(logInfo.type());
+			PreparedStatement statement = userConnection.prepareStatement(getCityCountSQL);
 			ResultSet rs = statement.executeQuery();
 			if (rs.next()) {
 				return rs.getInt(1);
@@ -1337,7 +1392,7 @@ public class DBManipulation implements IDatabaseManipulation {
 				return 0;
 			}
 		} catch (SQLException e) {
-			Main.getThrowableHandler().feedBackThrowable(e);
+			feedbackThrowable(e);
 		}
 		return -1;
 	}
@@ -1347,11 +1402,11 @@ public class DBManipulation implements IDatabaseManipulation {
 	@Override
 	public int getCourierCount(LogInfo logInfo) {
 		try {
-			if (logInfo.type() != StaffType.SustcManager || !checkUser(logInfo)) {
+			if (!checkUser(logInfo)) {
 				return -1;
 			}
-			
-			PreparedStatement statement = this.conn.prepareStatement(getCourierCountSQL);
+			Connection userConnection = getUserConnection(logInfo.type());
+			PreparedStatement statement = userConnection.prepareStatement(getCourierCountSQL);
 			ResultSet rs = statement.executeQuery();
 			if (rs.next()) {
 				return rs.getInt(1);
@@ -1359,7 +1414,7 @@ public class DBManipulation implements IDatabaseManipulation {
 				return 0;
 			}
 		} catch (SQLException e) {
-			Main.getThrowableHandler().feedBackThrowable(e);
+			feedbackThrowable(e);
 		}
 		return -1;
 	}
@@ -1369,11 +1424,11 @@ public class DBManipulation implements IDatabaseManipulation {
 	@Override
 	public int getShipCount(LogInfo logInfo) {
 		try {
-			if (logInfo.type() != StaffType.SustcManager || !checkUser(logInfo)) {
+			if (!checkUser(logInfo)) {
 				return -1;
 			}
-			
-			PreparedStatement statement = this.conn.prepareStatement(getShipCountSQL);
+			Connection userConnection = getUserConnection(logInfo.type());
+			PreparedStatement statement = userConnection.prepareStatement(getShipCountSQL);
 			ResultSet rs = statement.executeQuery();
 			if (rs.next()) {
 				return rs.getInt(1);
@@ -1381,7 +1436,7 @@ public class DBManipulation implements IDatabaseManipulation {
 				return 0;
 			}
 		} catch (SQLException e) {
-			Main.getThrowableHandler().feedBackThrowable(e);
+			feedbackThrowable(e);
 		}
 		return -1;
 	}
@@ -1410,6 +1465,10 @@ public class DBManipulation implements IDatabaseManipulation {
 		
 	}
 	
+	private static String getDescriptionByItemState(ItemState state) {
+		return stateStringMap.get(state);
+	}
+	
 	private static ItemState getItemStateByDescription(String message) {
 		return stringStateMap.get(message);
 	}
@@ -1423,32 +1482,33 @@ public class DBManipulation implements IDatabaseManipulation {
 	@Override
 	public ItemInfo getItemInfo(LogInfo logInfo, String s) {
 		try {
-			if (logInfo.type() != StaffType.SustcManager || !checkUser(logInfo)) {
+			if (!checkUser(logInfo)) {
 				return null;
 			}
-			PreparedStatement itemStatement = this.conn.prepareStatement(getItemSQL);
+			Connection userConnection = getUserConnection(logInfo.type());
+			PreparedStatement itemStatement = userConnection.prepareStatement(getItemSQL);
 			itemStatement.setString(1, s);
 			ResultSet itemRs = itemStatement.executeQuery();
 			if (itemRs.next()) {
-				PreparedStatement importStatement = this.conn.prepareStatement(getImportSQL);
+				PreparedStatement importStatement = userConnection.prepareStatement(getImportSQL);
 				importStatement.setString(1, s);
 				ResultSet importRs = importStatement.executeQuery();
 				importRs.next();
 				ImportExportInfo importInfo = new ImportExportInfo(importRs.getString(1), importRs.getString(2), importRs.getDouble(3));
 				
-				PreparedStatement exportStatement = this.conn.prepareStatement(getExportSQL);
+				PreparedStatement exportStatement = userConnection.prepareStatement(getExportSQL);
 				exportStatement.setString(1, s);
 				ResultSet exportRs = exportStatement.executeQuery();
 				exportRs.next();
 				ImportExportInfo exportInfo = new ImportExportInfo(exportRs.getString(1), exportRs.getString(2), exportRs.getDouble(3));
 				
-				PreparedStatement retrievalStatement = this.conn.prepareStatement(getRetrievalSQL);
+				PreparedStatement retrievalStatement = userConnection.prepareStatement(getRetrievalSQL);
 				retrievalStatement.setString(1, s);
 				ResultSet retrievalRs = retrievalStatement.executeQuery();
 				retrievalRs.next();
 				RetrievalDeliveryInfo retrievalInfo = new RetrievalDeliveryInfo(retrievalRs.getString(1), retrievalRs.getString(2));
 				
-				PreparedStatement deliveryStatement = this.conn.prepareStatement(getDeliverySQL);
+				PreparedStatement deliveryStatement = userConnection.prepareStatement(getDeliverySQL);
 				deliveryStatement.setString(1, s);
 				ResultSet deliveryRs = deliveryStatement.executeQuery();
 				deliveryRs.next();
@@ -1460,8 +1520,7 @@ public class DBManipulation implements IDatabaseManipulation {
 				return null;
 			}
 		} catch (SQLException e) {
-			e.printStackTrace();
-			Main.getThrowableHandler().feedBackThrowable(e);
+			feedbackThrowable(e);
 		}
 		return null;
 	}
@@ -1471,10 +1530,11 @@ public class DBManipulation implements IDatabaseManipulation {
 	@Override
 	public ShipInfo getShipInfo(LogInfo logInfo, String s) {
 		try {
-			if (logInfo.type() != StaffType.SustcManager || !checkUser(logInfo)) {
+			if (!checkUser(logInfo)) {
 				return null;
 			}
-			PreparedStatement shipStatement = this.conn.prepareStatement(getShipInfoSQL);
+			Connection userConnection = getUserConnection(logInfo.type());
+			PreparedStatement shipStatement = userConnection.prepareStatement(getShipInfoSQL);
 			shipStatement.setString(1, s);
 			ResultSet shipRs = shipStatement.executeQuery();
 			boolean isSailing = false;
@@ -1483,7 +1543,7 @@ public class DBManipulation implements IDatabaseManipulation {
 				if (company == null) {
 					company = shipRs.getString(2);
 				}
-				PreparedStatement itemStatement = this.conn.prepareStatement(getItemSQL);
+				PreparedStatement itemStatement = userConnection.prepareStatement(getItemSQL);
 				itemStatement.setString(1, shipRs.getString(1));
 				ResultSet itemRs = itemStatement.executeQuery();
 				itemRs.next();
@@ -1498,7 +1558,7 @@ public class DBManipulation implements IDatabaseManipulation {
 			ShipInfo shipInfo = new ShipInfo(s, company, isSailing);
 			return shipInfo;
 		} catch (SQLException e) {
-			Main.getThrowableHandler().feedBackThrowable(e);
+			feedbackThrowable(e);
 		}
 		return null;
 	}
@@ -1526,10 +1586,11 @@ public class DBManipulation implements IDatabaseManipulation {
 	@Override
 	public ContainerInfo getContainerInfo(LogInfo logInfo, String s) {
 		try {
-			if (logInfo.type() != StaffType.SustcManager || !checkUser(logInfo)) {
+			if (!checkUser(logInfo)) {
 				return null;
 			}
-			PreparedStatement containerStatement = this.conn.prepareStatement(getContainerInfoSQL);
+			Connection userConnection = getUserConnection(logInfo.type());
+			PreparedStatement containerStatement = userConnection.prepareStatement(getContainerInfoSQL);
 			containerStatement.setString(1, s);
 			ResultSet containerRs = containerStatement.executeQuery();
 			boolean isUsing = false;
@@ -1538,7 +1599,7 @@ public class DBManipulation implements IDatabaseManipulation {
 				if (type == null) {
 					type = containerRs.getString(2);
 				}
-				PreparedStatement itemStatement = this.conn.prepareStatement(getItemSQL);
+				PreparedStatement itemStatement = userConnection.prepareStatement(getItemSQL);
 				itemStatement.setString(1, containerRs.getString(1));
 				ResultSet itemRs = itemStatement.executeQuery();
 				itemRs.next();
@@ -1554,7 +1615,7 @@ public class DBManipulation implements IDatabaseManipulation {
 			ContainerInfo containerInfo = new ContainerInfo(getContainerTypeByDescription(type), s, isUsing);
 			return containerInfo;
 		} catch (SQLException e) {
-			Main.getThrowableHandler().feedBackThrowable(e);
+			feedbackThrowable(e);
 		}
 		return null;
 	}
@@ -1583,10 +1644,11 @@ public class DBManipulation implements IDatabaseManipulation {
 	@Override
 	public StaffInfo getStaffInfo(LogInfo logInfo, String s) {
 		try {
-			if (logInfo.type() != StaffType.SustcManager || !checkUser(logInfo)) {
+			if (!checkUser(logInfo)) {
 				return null;
 			}
-			PreparedStatement statement = this.conn.prepareStatement(getStaffInfoSQL);
+			Connection userConnection = getUserConnection(logInfo.type());
+			PreparedStatement statement = userConnection.prepareStatement(getStaffInfoSQL);
 			statement.setString(1, s);
 			ResultSet rs = statement.executeQuery();
 			if (!rs.next()) {
@@ -1596,7 +1658,7 @@ public class DBManipulation implements IDatabaseManipulation {
 			int currentYear = Calendar.getInstance().get(Calendar.YEAR);
 			return new StaffInfo(new LogInfo(s, getStaffTypeByDescription(rs.getString(3)), rs.getString(2)), rs.getString(8), rs.getString(4), rs.getBoolean(5), currentYear - birthYear, rs.getString(6));
 		} catch (SQLException e) {
-			Main.getThrowableHandler().feedBackThrowable(e);
+			feedbackThrowable(e);
 		}
 		return null;
 	}
