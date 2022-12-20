@@ -17,11 +17,11 @@ import static org.junit.jupiter.api.Assertions.*;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class LocalJudge {
 
-    private static String database = "localhost:5432/postgres";
+    private static String database = "localhost:5432/cslab1";
 
-    private static String root = "postgres";
+    private static String root = "test";
 
-    private static String pass = "ljcfyh_123@99";
+    private static String pass = "123456";
 
     private static String recordsCSV = "./data/records.csv";
 

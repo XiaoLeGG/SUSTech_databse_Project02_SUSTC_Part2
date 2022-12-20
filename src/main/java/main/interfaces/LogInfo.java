@@ -9,7 +9,7 @@ import java.io.Serializable;
  * @classname: LogInfo
 */
 
-public record LogInfo(String name, StaffType type, String password) implements Serializable {
+public record LogInfo (String name, StaffType type, String password) implements Serializable {
     public enum StaffType {
         SustcManager,
         CompanyManager,

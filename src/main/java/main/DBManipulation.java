@@ -1,16 +1,27 @@
 package main;
 
 
-import java.sql.*;
-import java.util.*;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Types;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Scanner;
 
 import main.interfaces.*;
-import main.interfaces.ContainerInfo.Type;
+import main.interfaces.LogInfo.StaffType;
 import main.interfaces.ItemInfo.ImportExportInfo;
 import main.interfaces.ItemInfo.RetrievalDeliveryInfo;
-import main.interfaces.ItemState;
-import main.interfaces.LogInfo.StaffType;
-
+import main.interfaces.ContainerInfo.Type;
 
 public class DBManipulation implements IDatabaseManipulation {
 	
@@ -105,13 +116,28 @@ public class DBManipulation implements IDatabaseManipulation {
 					+ "    state varchar not null," 
 					+ "    primary key (name)"
 					+ ");"
+					+ "alter table delivery_information drop constraint if exists foreignKey_deliveryInformation_itemName;"
+					+ "alter table retrieval_information drop constraint if exists foreignKey_retrievalInformation_itemName;"
+					+ "alter table export_information drop constraint if exists foreignKey_exportInformation_itemName;"
+					+ "alter table import_information drop constraint if exists foreignKey_importInformation_itemName;"
+					+ "alter table ship drop constraint if exists foreignKey_ship_itemName;"
+					+ "alter table container drop constraint if exists foreignKey_container_itemName;"
 					+ "alter table delivery_information add constraint foreignKey_deliveryInformation_itemName foreign key (item_name) references item(name);"
 					+ "alter table retrieval_information add constraint foreignKey_retrievalInformation_itemName foreign key (item_name) references item(name);"
 					+ "alter table export_information add constraint foreignKey_exportInformation_itemName foreign key (item_name) references item(name);"
 					+ "alter table import_information add constraint foreignKey_importInformation_itemName foreign key (item_name) references item(name);"
 					+ "alter table ship add constraint foreignKey_ship_itemName foreign key (item_name) references item(name);"
 					+ "alter table container add constraint foreignKey_container_itemName foreign key (item_name) references item(name);");
-			
+			try {
+				this.rootConn.createStatement().execute(
+						"REVOKE ALL ON TABLE delivery_information, export_information, import_information, item, retrieval_information, ship, staff, container from cs307_ll_sustcm;"
+						+ "REVOKE ALL ON TABLE delivery_information, export_information, import_information, item, retrieval_information, ship, staff, container from cs307_ll_courier;"
+						+ "REVOKE ALL ON TABLE delivery_information, export_information, import_information, item, retrieval_information, ship, staff, container from cs307_ll_companym;"
+						+ "REVOKE ALL ON TABLE delivery_information, export_information, import_information, item, retrieval_information, ship, staff, container from cs307_ll_seaportm;"
+						);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
 			this.rootConn.createStatement().execute("DROP USER IF EXISTS cs307_ll_sustcm;"
 					+ "DROP USER IF EXISTS cs307_ll_courier;"
 					+ "DROP USER IF EXISTS cs307_ll_seaportm;"
@@ -401,6 +427,8 @@ public class DBManipulation implements IDatabaseManipulation {
 		}
 		return getStaffTypeByDescription(rs.getString(3)) == logInfo.type();
 	}
+	
+	
 
 
 	//Company Manager User
@@ -1657,6 +1685,24 @@ public class DBManipulation implements IDatabaseManipulation {
 			int birthYear = rs.getInt(7);
 			int currentYear = Calendar.getInstance().get(Calendar.YEAR);
 			return new StaffInfo(new LogInfo(s, getStaffTypeByDescription(rs.getString(3)), rs.getString(2)), rs.getString(8), rs.getString(4), rs.getBoolean(5), currentYear - birthYear, rs.getString(6));
+		} catch (SQLException e) {
+			feedbackThrowable(e);
+		}
+		return null;
+	}
+	
+	protected StaffInfo getStaffInfoByRoot(String user) {
+		try {
+			Connection userConnection = this.rootConn;
+			PreparedStatement statement = userConnection.prepareStatement(getStaffInfoSQL);
+			statement.setString(1, user);
+			ResultSet rs = statement.executeQuery();
+			if (!rs.next()) {
+				return null;
+			}
+			int birthYear = rs.getInt(7);
+			int currentYear = Calendar.getInstance().get(Calendar.YEAR);
+			return new StaffInfo(new LogInfo(user, getStaffTypeByDescription(rs.getString(3)), rs.getString(2)), rs.getString(8), rs.getString(4), rs.getBoolean(5), currentYear - birthYear, rs.getString(6));
 		} catch (SQLException e) {
 			feedbackThrowable(e);
 		}
