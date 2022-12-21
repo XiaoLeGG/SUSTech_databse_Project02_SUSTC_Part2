@@ -851,26 +851,7 @@ public class DBManipulation implements IDatabaseManipulation {
 		}
 		return false;
 	}
-
-	public int stateToInt(ItemState itemState) {
-		if (itemState == null) return 0;
-		switch (itemState) {
-			case PickingUp: return 1;
-			case ToExportTransporting: return 2;
-			case ExportChecking: return 3;
-			case ExportCheckFailed: return 4;
-			case PackingToContainer: return 5;
-			case WaitingForShipping: return 6;
-			case Shipping: return 7;
-			case UnpackingFromContainer: return 8;
-			case ImportChecking: return 9;
-			case ImportCheckFailed: return 10;
-			case FromImportTransporting: return 11;
-			case Delivering: return 12;
-			case Finish: return 13;
-			default: return 0;
-		}
-	}
+	
 	//Courier User
 	private static final String checkItemSQL = "select case (select count(*) from item where name = ?)" +
 			"    when 0 then true" +
@@ -918,7 +899,7 @@ public class DBManipulation implements IDatabaseManipulation {
 
 			if (itemInfo.delivery() == null) return false;
 			if (itemInfo.delivery().city() == null) return false;
-			if (itemInfo.delivery().courier() == null && stateToInt(itemInfo.state()) >= 11) return false;
+			if (itemInfo.delivery().courier() == null && itemInfo.state().ordinal() >= 10) return false;
 			if (itemInfo.delivery().courier() != null) {
 				statement = userConnection.prepareStatement(checkStaffCity);
 				statement.setString(1, itemInfo.delivery().courier());
@@ -931,7 +912,7 @@ public class DBManipulation implements IDatabaseManipulation {
 
 			if (itemInfo.export() == null) return false;
 			if (itemInfo.export().city() == null) return false;
-			if (itemInfo.export().officer() == null && stateToInt(itemInfo.state()) >= 3) return false;
+			if (itemInfo.export().officer() == null && itemInfo.state().ordinal() >= 2) return false;
 			if (itemInfo.export().officer() != null) {
 				statement = userConnection.prepareStatement(checkStaffCity);
 				statement.setString(1, itemInfo.export().officer());
@@ -944,7 +925,7 @@ public class DBManipulation implements IDatabaseManipulation {
 
 			if (itemInfo.$import() == null) return false;
 			if (itemInfo.$import().city() == null) return false;
-			if (itemInfo.$import().officer() == null && stateToInt(itemInfo.state()) >= 9) return false;
+			if (itemInfo.$import().officer() == null && itemInfo.state().ordinal() >= 8) return false;
 			if (itemInfo.$import().officer() != null) {
 				statement = userConnection.prepareStatement(checkStaffCity);
 				statement.setString(1, itemInfo.$import().officer());
@@ -990,9 +971,9 @@ public class DBManipulation implements IDatabaseManipulation {
 				containerType = rs.getString(3);
 				if (containerCode == null && containerType != null) return false;
 				if (containerCode != null && containerType == null) return false;
-				if (containerCode == null && containerType == null && stateToInt(itemInfo.state()) >= 5) return false;
+				if (containerCode == null && containerType == null && itemInfo.state().ordinal() >= 4) return false;
 			} else {
-				if (stateToInt(itemInfo.state()) >= 5) return false;
+				if (itemInfo.state().ordinal() >= 4) return false;
 			}
 			String shipName = null, company = null;
 			statement = userConnection.prepareStatement(checkShipSQL);
@@ -1002,9 +983,9 @@ public class DBManipulation implements IDatabaseManipulation {
 				shipName = rs.getString(2);
 				company = rs.getString(3);
 				if (company == null) return false;
-				if (shipName == null && stateToInt(itemInfo.state()) >= 7) return false;
+				if (shipName == null && itemInfo.state().ordinal() >= 6) return false;
 			} else {
-				if (stateToInt(itemInfo.state()) >= 7) return false;
+				if (itemInfo.state().ordinal() >= 6) return false;
 			}
 		} catch (SQLException e) {
 			return false;
@@ -1027,7 +1008,7 @@ public class DBManipulation implements IDatabaseManipulation {
 			if (checkItem(itemInfo, true, logInfo.name(), userConnection) == false) {
 				return false;
 			}
-			if (stateToInt(itemInfo.state()) > 1) {
+			if (itemInfo.state().ordinal() > 0) {
 				return false;
 			}
 			PreparedStatement statement;

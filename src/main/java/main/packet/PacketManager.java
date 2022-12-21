@@ -6,14 +6,22 @@ import java.util.HashMap;
 
 import main.packet.client.CityCountPacket;
 import main.packet.client.CompanyCountPacket;
+import main.packet.client.ContainerPacket;
 import main.packet.client.CourierCountPacket;
+import main.packet.client.ItemPacket;
 import main.packet.client.LoginPacket;
 import main.packet.client.ShipCountPacket;
+import main.packet.client.ShipPacket;
+import main.packet.client.StaffPacket;
 import main.packet.server.CityCountInfoPacket;
 import main.packet.server.CompanyCountInfoPacket;
+import main.packet.server.ContainerInfoPacket;
 import main.packet.server.CourierCountInfoPacket;
+import main.packet.server.ItemInfoPacket;
 import main.packet.server.LoginInfoPacket;
 import main.packet.server.ShipCountInfoPacket;
+import main.packet.server.ShipInfoPacket;
+import main.packet.server.StaffInfoPacket;
 
 
 
@@ -38,7 +46,14 @@ public class PacketManager {
 		packetCodes.put(CourierCountInfoPacket.getStaticCode(), CourierCountInfoPacket.class);
 		packetCodes.put(ShipCountPacket.getStaticCode(), ShipCountPacket.class);
 		packetCodes.put(ShipCountInfoPacket.getStaticCode(), ShipCountInfoPacket.class);
-
+		packetCodes.put(ContainerPacket.getStaticCode(), ContainerPacket.class);
+		packetCodes.put(ContainerInfoPacket.getStaticCode(), ContainerInfoPacket.class);
+		packetCodes.put(ShipPacket.getStaticCode(), ShipPacket.class);
+		packetCodes.put(ShipInfoPacket.getStaticCode(), ShipInfoPacket.class);
+		packetCodes.put(ItemPacket.getStaticCode(), ItemPacket.class);
+		packetCodes.put(ItemInfoPacket.getStaticCode(), ItemInfoPacket.class);
+		packetCodes.put(StaffPacket.getStaticCode(), StaffPacket.class);
+		packetCodes.put(StaffInfoPacket.getStaticCode(), StaffInfoPacket.class);
 	}
 	
 	public static PacketManager getInstance() {

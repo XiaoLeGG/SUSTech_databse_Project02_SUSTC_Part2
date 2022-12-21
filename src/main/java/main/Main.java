@@ -10,20 +10,32 @@ import java.net.Socket;
 import java.util.HashMap;
 import java.util.UUID;
 
+import main.interfaces.ContainerInfo;
 import main.interfaces.LogInfo;
 import main.interfaces.StaffInfo;
+import main.interfaces.ShipInfo;
+import main.interfaces.ItemInfo;
+
 import main.packet.Packet;
 import main.packet.PacketManager;
 import main.packet.client.CityCountPacket;
 import main.packet.client.CompanyCountPacket;
+import main.packet.client.ContainerPacket;
 import main.packet.client.CourierCountPacket;
+import main.packet.client.ItemPacket;
 import main.packet.client.LoginPacket;
 import main.packet.client.ShipCountPacket;
+import main.packet.client.ShipPacket;
+import main.packet.client.StaffPacket;
 import main.packet.server.CityCountInfoPacket;
 import main.packet.server.CompanyCountInfoPacket;
+import main.packet.server.ContainerInfoPacket;
 import main.packet.server.CourierCountInfoPacket;
+import main.packet.server.ItemInfoPacket;
 import main.packet.server.LoginInfoPacket;
 import main.packet.server.ShipCountInfoPacket;
+import main.packet.server.ShipInfoPacket;
+import main.packet.server.StaffInfoPacket;
 
 public class Main {
 	private static String url = "localhost:5432/cslab1";
@@ -100,6 +112,42 @@ public class Main {
 						count = databaseManager.getShipCount(info);
 					}
 					backPacket = new ShipCountInfoPacket(count);
+				}
+				if (packet instanceof ContainerPacket) {
+					ContainerPacket cp = (ContainerPacket) packet;
+					LogInfo info = session.get(UUID.fromString(cp.getCookie()));
+					ContainerInfo ci = null;
+					if (info != null) {
+						ci = databaseManager.getContainerInfo(info, cp.getContainerCode());
+					}
+					backPacket = new ContainerInfoPacket(ci);
+				}
+				if (packet instanceof ShipPacket) {
+					ShipPacket sp = (ShipPacket) packet;
+					LogInfo info = session.get(UUID.fromString(sp.getCookie()));
+					ShipInfo si = null;
+					if (info != null) {
+						si = databaseManager.getShipInfo(info, sp.getShip());
+					}
+					backPacket = new ShipInfoPacket(si);
+				}
+				if (packet instanceof ItemPacket) {
+					ItemPacket ip = (ItemPacket) packet;
+					LogInfo info = session.get(UUID.fromString(ip.getCookie()));
+					ItemInfo ii = null;
+					if (info != null) {
+						ii = databaseManager.getItemInfo(info, ip.getItem());
+					}
+					backPacket = new ItemInfoPacket(ii);
+				}
+				if (packet instanceof StaffPacket) {
+					StaffPacket sp = (StaffPacket) packet;
+					LogInfo info = session.get(UUID.fromString(sp.getCookie()));
+					StaffInfo si = null;
+					if (info != null) {
+						si = databaseManager.getStaffInfo(info, sp.getStaff());
+					}
+					backPacket = new StaffInfoPacket(si);
 				}
 				BufferedOutputStream writer = new BufferedOutputStream(socket.getOutputStream());
 				writer.write((backPacket.getCode() + "@" + backPacket.getContext()).getBytes());
