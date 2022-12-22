@@ -146,12 +146,32 @@ public class DBManipulation implements IDatabaseManipulation {
 					+ "CREATE USER cs307_ll_companym WITH PASSWORD '123456';"
 					+ "GRANT SELECT ON staff, container, ship, item, import_information, export_information,  retrieval_information, delivery_information TO cs307_ll_sustcm;"
 					
-					+ "GRANT SELECT ON item, container, ship, staff, retrieval_information, delivery_information TO cs307_ll_courier;"
+					+ "GRANT SELECT(name, type, price, state) ON item TO cs307_ll_courier;"
+					+ "GRANT SELECT(name, city) ON staff TO cs307_ll_courier;"
+					+ "GRANT SELECT(item_name, tax, city) ON import_information, export_information TO cs307_ll_courier;"
+					+ "GRANT SELECT(item_name, staff_name) ON retrieval_information TO cs307_ll_courier;"
+					+ "GRANT SELECT(item_name, city, staff_name) ON delivery_information TO cs307_ll_courier;"
+					+ "GRANT INSERT ON item, delivery_information, retrieval_information, import_information, export_information TO cs307_ll_courier;"
+					+ "GRANT UPDATE(state) ON item TO cs307_ll_courier;"
+					+ "GRANT UPDATE(staff_name) ON delivery_information TO cs307_ll_courier;"
 					+ "GRANT INSERT ON delivery_information, export_information, import_information, item, retrieval_information TO cs307_ll_courier;"
 					+ "GRANT UPDATE ON item, delivery_information TO cs307_ll_courier;"
 					
-					+ "GRANT SELECT ON import_information, export_information, item TO cs307_ll_seaportm;"
-					+ "GRANT UPDATE ON export_information, export_information TO cs307_ll_seaportm;");
+					+ "GRANT SELECT(name, price, state, type) ON item TO cs307_ll_companym;"
+					+ "GRANT SELECT(item_name, tax, city) ON import_information, export_information TO cs307_ll_companym;"
+					+ "GRANT SELECT(item_name, code, type) ON container TO cs307_ll_companym;"
+					+ "GRANT SELECT(item_name, ship_name, company) ON ship TO cs307_ll_companym;"
+					+ "GRANT SELECT(name, company) ON staff TO cs307_ll_companym;"
+					+ "GRANT UPDATE(state) ON item TO cs307_ll_companym;"
+					+ "GRANT UPDATE(ship_name) ON ship TO cs307_ll_companym;"
+					+ "GRANT UPDATE(code, type) ON container TO cs307_ll_companym;"
+
+					+ "GRANT SELECT(name, state) ON item TO cs307_ll_seaportm;"
+					+ "GRANT SELECT(name, city) ON staff TO cs307_ll_seaportm;"
+					+ "GRANT SELECT(item_name, city, staff_name) ON import_information, export_information TO cs307_ll_seaportm;"
+					+ "GRANT UPDATE(state) ON item TO cs307_ll_seaportm;"
+					+ "GRANT UPDATE(staff_name) ON import_information, export_information TO cs307_ll_seaportm;");
+					
 			this.sustcManagerConn = createConnection(database, "cs307_ll_sustcm", "123456");
 			this.companyManagerConn = createConnection(database, "cs307_ll_companym", "123456");
 			this.seaportConn = createConnection(database, "cs307_ll_seaportm", "123456");
@@ -477,10 +497,10 @@ public class DBManipulation implements IDatabaseManipulation {
 	
 	private Connection getUserConnection(StaffType type) {
 		if (type == StaffType.CompanyManager) {
-			return this.rootConn;
+			return this.companyManagerConn;
 		}
 		if (type == StaffType.SeaportOfficer) {
-			return this.rootConn;
+			return this.seaportConn;
 		}
 		if (type == StaffType.Courier) {
 			return this.courierConn;
@@ -861,21 +881,21 @@ public class DBManipulation implements IDatabaseManipulation {
 			"    when 0 then true" +
 			"    else false" +
 			" end";
-	private static final String checkContainerSQL = "select * from container where item_name = ?";
-	private static final String checkShipSQL = "select * from ship where item_name = ?";
+//	private static final String checkContainerSQL = "select * from container where item_name = ?";
+//	private static final String checkShipSQL = "select * from ship where item_name = ?";
 
-	private static final String checkStaffCity = "select case (select count(name, city) from staff where name = ? and city = ?)" +
+	private static final String checkStaffCity = "select case (select count(*) from staff where name = ? and city = ?)" +
 			"	when 0 then false" +
 			"	else true" +
 			" end";
-	
+
 	public static int getOrdinal(ItemState state) {
 		if (state == null) {
 			return -1;
 		} else return state.ordinal();
 	}
-	
-	public boolean checkItem(ItemInfo itemInfo, boolean isNewItem, String retrievalCourier, Connection userConnection) {
+
+	public boolean checkItem(ItemInfo itemInfo, String retrievalCourier, Connection userConnection) {
 		if (itemInfo == null) return false;
 		try {
 			PreparedStatement statement;
@@ -889,24 +909,17 @@ public class DBManipulation implements IDatabaseManipulation {
 			}
 			if (itemInfo.name() == null) return false;
 			if (itemInfo.$class() == null) return false;
-			if (!isNewItem) {
-				if (itemInfo.retrieval() == null) return false;
-				if (itemInfo.retrieval().city() == null) return false;
-				if (itemInfo.retrieval().courier() == null) return false;
-			} else {
-				if (itemInfo.retrieval() == null) return false;
-				if (itemInfo.retrieval().city() == null) return false;
-				if (itemInfo.retrieval().courier() != null && !itemInfo.retrieval().courier().equals(retrievalCourier))
-					return false;
-				statement = userConnection.prepareStatement(checkStaffCity);
-				statement.setString(1, retrievalCourier);
-				statement.setString(2, itemInfo.retrieval().city());
-				rs = statement.executeQuery();
-				if (rs.next()) {
-					if (rs.getBoolean(1) == false) return false;
-				} else return false;
-			}
-
+			if (itemInfo.retrieval() == null) return false;
+			if (itemInfo.retrieval().city() == null) return false;
+			if (itemInfo.retrieval().courier() != null && !itemInfo.retrieval().courier().equals(retrievalCourier))
+				return false;
+			statement = userConnection.prepareStatement(checkStaffCity);
+			statement.setString(1, retrievalCourier);
+			statement.setString(2, itemInfo.retrieval().city());
+			rs = statement.executeQuery();
+			if (rs.next()) {
+				if (rs.getBoolean(1) == false) return false;
+			} else return false;
 			if (itemInfo.delivery() == null) return false;
 			if (itemInfo.delivery().city() == null) return false;
 			if (itemInfo.delivery().courier() == null && getOrdinal(itemInfo.state()) >= 10) return false;
@@ -971,32 +984,32 @@ public class DBManipulation implements IDatabaseManipulation {
 			} else {
 				return false;
 			}
-
-			String containerCode = null, containerType = null;
-			statement = userConnection.prepareStatement(checkContainerSQL);
-			statement.setString(1, itemInfo.name());
-			rs = statement.executeQuery();
-			if (rs.next()) {
-				containerCode = rs.getString(2);
-				containerType = rs.getString(3);
-				if (containerCode == null && containerType != null) return false;
-				if (containerCode != null && containerType == null) return false;
-				if (containerCode == null && containerType == null && getOrdinal(itemInfo.state()) >= 4) return false;
-			} else {
-				if (getOrdinal(itemInfo.state()) >= 4) return false;
-			}
-			String shipName = null, company = null;
-			statement = userConnection.prepareStatement(checkShipSQL);
-			statement.setString(1, itemInfo.name());
-			rs = statement.executeQuery();
-			if (rs.next()) {
-				shipName = rs.getString(2);
-				company = rs.getString(3);
-				if (company == null) return false;
-				if (shipName == null && getOrdinal(itemInfo.state()) >= 6) return false;
-			} else {
-				if (getOrdinal(itemInfo.state()) >= 6) return false;
-			}
+//
+//			String containerCode = null, containerType = null;
+//			statement = userConnection.prepareStatement(checkContainerSQL);
+//			statement.setString(1, itemInfo.name());
+//			rs = statement.executeQuery();
+//			if (rs.next()) {
+//				containerCode = rs.getString(2);
+//				containerType = rs.getString(3);
+//				if (containerCode == null && containerType != null) return false;
+//				if (containerCode != null && containerType == null) return false;
+//				if (containerCode == null && containerType == null && getOrdinal(itemInfo.state()) >= 4) return false;
+//			} else {
+//				if (getOrdinal(itemInfo.state()) >= 4) return false;
+//			}
+//			String shipName = null, company = null;
+//			statement = userConnection.prepareStatement(checkShipSQL);
+//			statement.setString(1, itemInfo.name());
+//			rs = statement.executeQuery();
+//			if (rs.next()) {
+//				shipName = rs.getString(2);
+//				company = rs.getString(3);
+//				if (company == null) return false;
+//				if (shipName == null && getOrdinal(itemInfo.state()) >= 6) return false;
+//			} else {
+//				if (getOrdinal(itemInfo.state()) >= 6) return false;
+//			}
 		} catch (SQLException e) {
 			feedbackThrowable(e);
 			return false;
@@ -1016,7 +1029,7 @@ public class DBManipulation implements IDatabaseManipulation {
 				return false;
 			}
 			Connection userConnection = getUserConnection(logInfo.type());
-			if (checkItem(itemInfo, true, logInfo.name(), userConnection) == false) {
+			if (checkItem(itemInfo, logInfo.name(), userConnection) == false) {
 				return false;
 			}
 			if (getOrdinal(itemInfo.state()) > 0) {
@@ -1029,7 +1042,7 @@ public class DBManipulation implements IDatabaseManipulation {
 			statement.setDouble(3, itemInfo.price());
 			statement.setString(4, "Picking-up");
 			statement.execute();
-			
+
 			statement.close();
 			statement = userConnection.prepareStatement(insertNewItemSQL2);
 			statement.setString(1, itemInfo.name());
