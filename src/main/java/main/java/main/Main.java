@@ -24,6 +24,7 @@ import main.packet.client.ContainerPacket;
 import main.packet.client.CourierCountPacket;
 import main.packet.client.ItemPacket;
 import main.packet.client.LoginPacket;
+import main.packet.client.NewItemPacket;
 import main.packet.client.ShipCountPacket;
 import main.packet.client.ShipPacket;
 import main.packet.client.StaffPacket;
@@ -33,6 +34,7 @@ import main.packet.server.ContainerInfoPacket;
 import main.packet.server.CourierCountInfoPacket;
 import main.packet.server.ItemInfoPacket;
 import main.packet.server.LoginInfoPacket;
+import main.packet.server.NewItemInfoPacket;
 import main.packet.server.ShipCountInfoPacket;
 import main.packet.server.ShipInfoPacket;
 import main.packet.server.StaffInfoPacket;
@@ -43,8 +45,6 @@ public class Main {
 	private static String pass = "123456";
 	
 	private static HashMap<UUID, LogInfo> session;
-	
-	private static ThrowableHandler th;
 
 	public static void main(String[] args) throws IOException {
 		
@@ -53,7 +53,6 @@ public class Main {
 		//serverSocket.bind(new InetSocketAddress(InetAddress.getLocalHost().getHostAddress(), 23333));
 		serverSocket.bind(new InetSocketAddress("localhost", 23333));
 		System.out.println("Server has been bound to 23333");
-		th = new ThrowableHandler();
 		session = new HashMap<>();
 		while (true) {
 			Socket socket = serverSocket.accept();
@@ -149,6 +148,15 @@ public class Main {
 					}
 					backPacket = new StaffInfoPacket(si);
 				}
+				if (packet instanceof NewItemPacket) {
+					NewItemPacket np = (NewItemPacket) packet;
+					LogInfo info = session.get(UUID.fromString(np.getCookie()));
+					boolean success = false;
+					if (info != null) {
+						success = databaseManager.newItem(info, np.getInfo());
+					}
+					backPacket = new NewItemInfoPacket(success);
+				}
 				BufferedOutputStream writer = new BufferedOutputStream(socket.getOutputStream());
 				writer.write((backPacket.getCode() + "@" + backPacket.getContext()).getBytes());
 				writer.flush();
@@ -158,10 +166,6 @@ public class Main {
 			socket.close();
 				
 		}
-	}
-	
-	protected static ThrowableHandler getThrowableHandler() {
-		return th;
 	}
 	
 }

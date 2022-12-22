@@ -135,9 +135,7 @@ public class DBManipulation implements IDatabaseManipulation {
 						+ "REVOKE ALL ON TABLE delivery_information, export_information, import_information, item, retrieval_information, ship, staff, container from cs307_ll_companym;"
 						+ "REVOKE ALL ON TABLE delivery_information, export_information, import_information, item, retrieval_information, ship, staff, container from cs307_ll_seaportm;"
 						);
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
+			} catch (Exception e) {}
 			this.rootConn.createStatement().execute("DROP USER IF EXISTS cs307_ll_sustcm;"
 					+ "DROP USER IF EXISTS cs307_ll_courier;"
 					+ "DROP USER IF EXISTS cs307_ll_seaportm;"
@@ -147,7 +145,13 @@ public class DBManipulation implements IDatabaseManipulation {
 					+ "CREATE USER cs307_ll_seaportm WITH PASSWORD '123456';"
 					+ "CREATE USER cs307_ll_companym WITH PASSWORD '123456';"
 					+ "GRANT SELECT ON staff, container, ship, item, import_information, export_information,  retrieval_information, delivery_information TO cs307_ll_sustcm;"
-					);
+					
+					+ "GRANT SELECT ON item, container, ship, staff, retrieval_information, delivery_information TO cs307_ll_courier;"
+					+ "GRANT INSERT ON delivery_information, export_information, import_information, item, retrieval_information TO cs307_ll_courier;"
+					+ "GRANT UPDATE ON item, delivery_information TO cs307_ll_courier;"
+					
+					+ "GRANT SELECT ON import_information, export_information, item TO cs307_ll_seaportm;"
+					+ "GRANT UPDATE ON export_information, export_information TO cs307_ll_seaportm;");
 			this.sustcManagerConn = createConnection(database, "cs307_ll_sustcm", "123456");
 			this.companyManagerConn = createConnection(database, "cs307_ll_companym", "123456");
 			this.seaportConn = createConnection(database, "cs307_ll_seaportm", "123456");
@@ -479,7 +483,7 @@ public class DBManipulation implements IDatabaseManipulation {
 			return this.rootConn;
 		}
 		if (type == StaffType.Courier) {
-			return this.rootConn;
+			return this.courierConn;
 		}
 		return this.sustcManagerConn;
 	}
@@ -860,7 +864,7 @@ public class DBManipulation implements IDatabaseManipulation {
 	private static final String checkContainerSQL = "select * from container where item_name = ?";
 	private static final String checkShipSQL = "select * from ship where item_name = ?";
 
-	private static final String checkStaffCity = "select case (select count(*) from staff where name = ? and city = ?)" +
+	private static final String checkStaffCity = "select case (select count(name, city) from staff where name = ? and city = ?)" +
 			"	when 0 then false" +
 			"	else true" +
 			" end";
@@ -994,6 +998,7 @@ public class DBManipulation implements IDatabaseManipulation {
 				if (getOrdinal(itemInfo.state()) >= 6) return false;
 			}
 		} catch (SQLException e) {
+			feedbackThrowable(e);
 			return false;
 		}
 		return true;
@@ -1362,7 +1367,7 @@ public class DBManipulation implements IDatabaseManipulation {
 	}
 	
 	
-	private static final String getCompanyCountSQL = "SELECT count(*) FROM (SELECT DISTINCT company FROM staff WHERE company IS NOT NULL) tb";
+	private static final String getCompanyCountSQL = "SELECT count(*) FROM (SELECT DISTINCT company FROM staff WHERE company IS NOT NULL) tb;";
 	//SUSTC Department Manager User
 	@Override
 	public int getCompanyCount(LogInfo logInfo) {
@@ -1412,7 +1417,7 @@ public class DBManipulation implements IDatabaseManipulation {
 		return -1;
 	}
 	
-	private static final String getCourierCountSQL = "SELECT count(*) FROM staff WHERE type = 'Courier'";
+	private static final String getCourierCountSQL = "SELECT count(*) FROM staff WHERE type = 'Courier';";
 	//SUSTC Department Manager User
 	@Override
 	public int getCourierCount(LogInfo logInfo) {
@@ -1488,11 +1493,11 @@ public class DBManipulation implements IDatabaseManipulation {
 		return stringStateMap.get(message);
 	}
 	
-	private static final String getItemSQL = "SELECT * FROM item WHERE name = ?";
-	private static final String getImportSQL = "SELECT city, staff_name, tax FROM import_information WHERE item_name = ?";
-	private static final String getExportSQL = "SELECT city, staff_name, tax FROM export_information WHERE item_name = ?";
-	private static final String getRetrievalSQL = "SELECT city, staff_name FROM retrieval_information WHERE item_name = ?";
-	private static final String getDeliverySQL = "SELECT city, staff_name FROM delivery_information WHERE item_name = ?";
+	private static final String getItemSQL = "SELECT * FROM item WHERE name = ?;";
+	private static final String getImportSQL = "SELECT city, staff_name, tax FROM import_information WHERE item_name = ?;";
+	private static final String getExportSQL = "SELECT city, staff_name, tax FROM export_information WHERE item_name = ?;";
+	private static final String getRetrievalSQL = "SELECT city, staff_name FROM retrieval_information WHERE item_name = ?;";
+	private static final String getDeliverySQL = "SELECT city, staff_name FROM delivery_information WHERE item_name = ?;";
 	//SUSTC Department Manager User
 	@Override
 	public ItemInfo getItemInfo(LogInfo logInfo, String s) {
@@ -1596,7 +1601,7 @@ public class DBManipulation implements IDatabaseManipulation {
 		return stringContainerTypeMap.get(description);
 	}
 	
-	private static final String getContainerInfoSQL = "SELECT item_name, type FROM container WHERE code = ?";
+	private static final String getContainerInfoSQL = "SELECT item_name, type FROM container WHERE code = ?;";
 	//SUSTC Department Manager User
 	@Override
 	public ContainerInfo getContainerInfo(LogInfo logInfo, String s) {

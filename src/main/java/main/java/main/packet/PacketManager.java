@@ -10,6 +10,8 @@ import main.packet.client.ContainerPacket;
 import main.packet.client.CourierCountPacket;
 import main.packet.client.ItemPacket;
 import main.packet.client.LoginPacket;
+import main.packet.client.NewItemPacket;
+import main.packet.client.SetItemStatePacket;
 import main.packet.client.ShipCountPacket;
 import main.packet.client.ShipPacket;
 import main.packet.client.StaffPacket;
@@ -19,6 +21,8 @@ import main.packet.server.ContainerInfoPacket;
 import main.packet.server.CourierCountInfoPacket;
 import main.packet.server.ItemInfoPacket;
 import main.packet.server.LoginInfoPacket;
+import main.packet.server.NewItemInfoPacket;
+import main.packet.server.SetItemStateInfoPacket;
 import main.packet.server.ShipCountInfoPacket;
 import main.packet.server.ShipInfoPacket;
 import main.packet.server.StaffInfoPacket;
@@ -54,6 +58,10 @@ public class PacketManager {
 		packetCodes.put(ItemInfoPacket.getStaticCode(), ItemInfoPacket.class);
 		packetCodes.put(StaffPacket.getStaticCode(), StaffPacket.class);
 		packetCodes.put(StaffInfoPacket.getStaticCode(), StaffInfoPacket.class);
+		packetCodes.put(NewItemPacket.getStaticCode(), NewItemPacket.class);
+		packetCodes.put(NewItemInfoPacket.getStaticCode(), NewItemInfoPacket.class);
+		packetCodes.put(SetItemStatePacket.getStaticCode(), SetItemStatePacket.class);
+		packetCodes.put(SetItemStateInfoPacket.getStaticCode(), SetItemStateInfoPacket.class);
 	}
 	
 	public static PacketManager getInstance() {
