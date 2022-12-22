@@ -468,18 +468,18 @@ public class DBManipulation implements IDatabaseManipulation {
 	}
 	
 	private static void feedbackThrowable(Throwable e) {
-		
+		e.printStackTrace();
 	}
 	
 	private Connection getUserConnection(StaffType type) {
 		if (type == StaffType.CompanyManager) {
-			return this.companyManagerConn;
+			return this.rootConn;
 		}
 		if (type == StaffType.SeaportOfficer) {
-			return this.seaportConn;
+			return this.rootConn;
 		}
 		if (type == StaffType.Courier) {
-			return this.courierConn;
+			return this.rootConn;
 		}
 		return this.sustcManagerConn;
 	}
@@ -856,15 +856,21 @@ public class DBManipulation implements IDatabaseManipulation {
 	private static final String checkItemSQL = "select case (select count(*) from item where name = ?)" +
 			"    when 0 then true" +
 			"    else false" +
-			"end";
+			" end";
 	private static final String checkContainerSQL = "select * from container where item_name = ?";
 	private static final String checkShipSQL = "select * from ship where item_name = ?";
 
 	private static final String checkStaffCity = "select case (select count(*) from staff where name = ? and city = ?)" +
 			"	when 0 then false" +
 			"	else true" +
-			"end";
-
+			" end";
+	
+	public static int getOrdinal(ItemState state) {
+		if (state == null) {
+			return -1;
+		} else return state.ordinal();
+	}
+	
 	public boolean checkItem(ItemInfo itemInfo, boolean isNewItem, String retrievalCourier, Connection userConnection) {
 		if (itemInfo == null) return false;
 		try {
@@ -899,7 +905,7 @@ public class DBManipulation implements IDatabaseManipulation {
 
 			if (itemInfo.delivery() == null) return false;
 			if (itemInfo.delivery().city() == null) return false;
-			if (itemInfo.delivery().courier() == null && itemInfo.state().ordinal() >= 10) return false;
+			if (itemInfo.delivery().courier() == null && getOrdinal(itemInfo.state()) >= 10) return false;
 			if (itemInfo.delivery().courier() != null) {
 				statement = userConnection.prepareStatement(checkStaffCity);
 				statement.setString(1, itemInfo.delivery().courier());
@@ -912,7 +918,7 @@ public class DBManipulation implements IDatabaseManipulation {
 
 			if (itemInfo.export() == null) return false;
 			if (itemInfo.export().city() == null) return false;
-			if (itemInfo.export().officer() == null && itemInfo.state().ordinal() >= 2) return false;
+			if (itemInfo.export().officer() == null && getOrdinal(itemInfo.state()) >= 2) return false;
 			if (itemInfo.export().officer() != null) {
 				statement = userConnection.prepareStatement(checkStaffCity);
 				statement.setString(1, itemInfo.export().officer());
@@ -925,7 +931,7 @@ public class DBManipulation implements IDatabaseManipulation {
 
 			if (itemInfo.$import() == null) return false;
 			if (itemInfo.$import().city() == null) return false;
-			if (itemInfo.$import().officer() == null && itemInfo.state().ordinal() >= 8) return false;
+			if (itemInfo.$import().officer() == null && getOrdinal(itemInfo.state()) >= 8) return false;
 			if (itemInfo.$import().officer() != null) {
 				statement = userConnection.prepareStatement(checkStaffCity);
 				statement.setString(1, itemInfo.$import().officer());
@@ -971,9 +977,9 @@ public class DBManipulation implements IDatabaseManipulation {
 				containerType = rs.getString(3);
 				if (containerCode == null && containerType != null) return false;
 				if (containerCode != null && containerType == null) return false;
-				if (containerCode == null && containerType == null && itemInfo.state().ordinal() >= 4) return false;
+				if (containerCode == null && containerType == null && getOrdinal(itemInfo.state()) >= 4) return false;
 			} else {
-				if (itemInfo.state().ordinal() >= 4) return false;
+				if (getOrdinal(itemInfo.state()) >= 4) return false;
 			}
 			String shipName = null, company = null;
 			statement = userConnection.prepareStatement(checkShipSQL);
@@ -983,9 +989,9 @@ public class DBManipulation implements IDatabaseManipulation {
 				shipName = rs.getString(2);
 				company = rs.getString(3);
 				if (company == null) return false;
-				if (shipName == null && itemInfo.state().ordinal() >= 6) return false;
+				if (shipName == null && getOrdinal(itemInfo.state()) >= 6) return false;
 			} else {
-				if (itemInfo.state().ordinal() >= 6) return false;
+				if (getOrdinal(itemInfo.state()) >= 6) return false;
 			}
 		} catch (SQLException e) {
 			return false;
@@ -1008,7 +1014,7 @@ public class DBManipulation implements IDatabaseManipulation {
 			if (checkItem(itemInfo, true, logInfo.name(), userConnection) == false) {
 				return false;
 			}
-			if (itemInfo.state().ordinal() > 0) {
+			if (getOrdinal(itemInfo.state()) > 0) {
 				return false;
 			}
 			PreparedStatement statement;
@@ -1079,7 +1085,7 @@ public class DBManipulation implements IDatabaseManipulation {
 	private static final String updateItemDeliveryCourier = "update delivery_information set staff_name = ? where item_name = ?";
 	private static final String checkItemDeliveryCourier = "select case " +
 			"(select count(*) from staff where name = ? and city = ?) when 0 then false" +
-			"else true end";
+			" else true end";
 	@Override
 	public boolean setItemState(LogInfo logInfo, String name, ItemState s) {
 		try {
