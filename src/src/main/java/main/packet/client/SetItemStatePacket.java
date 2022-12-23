@@ -24,6 +24,10 @@ public class SetItemStatePacket extends Packet {
 	public ItemState getState() {
 		return this.state;
 	}
+	
+	public String getItemName() {
+		return this.itemName;
+	}
 
 	@Override
 	public String getContext() {

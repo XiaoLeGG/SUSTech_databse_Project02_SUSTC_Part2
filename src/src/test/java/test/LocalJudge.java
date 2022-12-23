@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class LocalJudge {
 
-    private static String database = "localhost:5432/cslab1";
+    private static String database = "localhost:5432/cslab";
 
     private static String root = "test";
 
@@ -258,6 +258,9 @@ public class LocalJudge {
         treeSet.addAll(entries);
         for (Map.Entry<List<Object>, Boolean> entry : treeSet) {
             List<Object> params = entry.getKey();
+            if (entry.getValue() == true) {
+            	System.out.println(entry.getValue() + " " + params.get(0) + " " + params.get(1));
+            }
             assertEquals(entry.getValue(), manipulation.newItem((LogInfo) params.get(0), (ItemInfo) params.get(1)));
         }
 

@@ -765,6 +765,8 @@ public class DBManipulation implements IDatabaseManipulation {
 		return false;
 	}
 	
+
+	
 	//Company Manager User
 	private static final String getWaitingShippingItems = "with" +
 			"    tmp1 as (select item_name from ship where ship_name = ? and company = ?)," +

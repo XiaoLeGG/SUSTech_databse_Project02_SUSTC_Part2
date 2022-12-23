@@ -2,11 +2,15 @@ package main;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.UUID;
 
@@ -22,46 +26,66 @@ import main.packet.client.CityCountPacket;
 import main.packet.client.CompanyCountPacket;
 import main.packet.client.ContainerPacket;
 import main.packet.client.CourierCountPacket;
+import main.packet.client.ExportTaxRatePacket;
+import main.packet.client.ImportTaxRatePacket;
 import main.packet.client.ItemPacket;
+import main.packet.client.ItemWaitForCheckingPacket;
+import main.packet.client.LoadContainerToShipPacket;
+import main.packet.client.LoadItemToContainerPacket;
 import main.packet.client.LoginPacket;
 import main.packet.client.NewItemPacket;
+import main.packet.client.SetItemStatePacket;
 import main.packet.client.ShipCountPacket;
 import main.packet.client.ShipPacket;
 import main.packet.client.StaffPacket;
+import main.packet.client.StartShipSailingPacket;
+import main.packet.client.UnloadItemPacket;
 import main.packet.server.CityCountInfoPacket;
 import main.packet.server.CompanyCountInfoPacket;
 import main.packet.server.ContainerInfoPacket;
 import main.packet.server.CourierCountInfoPacket;
+import main.packet.server.ExportTaxRateInfoPacket;
+import main.packet.server.ImportTaxRateInfoPacket;
 import main.packet.server.ItemInfoPacket;
+import main.packet.server.ItemWaitForCheckingInfoPacket;
+import main.packet.server.LoadContainerToShipInfoPacket;
+import main.packet.server.LoadItemToContainerInfoPacket;
 import main.packet.server.LoginInfoPacket;
 import main.packet.server.NewItemInfoPacket;
+import main.packet.server.SetItemStateInfoPacket;
 import main.packet.server.ShipCountInfoPacket;
 import main.packet.server.ShipInfoPacket;
 import main.packet.server.StaffInfoPacket;
+import main.packet.server.StartShipSailingInfoPacket;
+import main.packet.server.UnloadItemInfoPacket;
 
 public class Main {
-	private static String url = "localhost:5432/cslab1";
-	private static String user = "test";
-	private static String pass = "123456";
+	private static final String url = "localhost:5432/cslab";
+	private static final String user = "test";
+	private static final String pass = "123456";
+	private static final int port = 23333;
+	private static final InetSocketAddress address = new InetSocketAddress("localhost", port);
+	
 	
 	private static HashMap<UUID, LogInfo> session;
 
 	public static void main(String[] args) throws IOException {
-		
+		writer = new PrintWriter(new BufferedWriter(new OutputStreamWriter(System.out)));
 		DBManipulation databaseManager = new DBManipulation(url, user, pass);
 		ServerSocket serverSocket = new ServerSocket();
 		//serverSocket.bind(new InetSocketAddress(InetAddress.getLocalHost().getHostAddress(), 23333));
-		serverSocket.bind(new InetSocketAddress("localhost", 23333));
-		System.out.println("Server has been bound to 23333");
+		serverSocket.bind(address);
+		debug("Server has been bound to port " + port, false);
 		session = new HashMap<>();
 		while (true) {
 			Socket socket = serverSocket.accept();
-			System.out.println("Receive socket...");
+			debug("Socket from " + socket.getInetAddress().getHostAddress() +  " connected...", false);
 			BufferedInputStream input = new BufferedInputStream(socket.getInputStream());
 			byte[] bytes = new byte[1024 * 8];
 			int len;
 			if ((len = input.read(bytes)) != -1) {
 				Packet packet = PacketManager.getInstance().receivePacket(len, bytes);
+				debug("Packet received from " + socket.getInetAddress().getHostAddress() + "...", false);
 				Packet backPacket = null;
 				if (packet instanceof LoginPacket) {
 					LoginPacket lp = (LoginPacket) packet;
@@ -157,6 +181,78 @@ public class Main {
 					}
 					backPacket = new NewItemInfoPacket(success);
 				}
+				if (packet instanceof SetItemStatePacket) {
+					SetItemStatePacket sisp = (SetItemStatePacket) packet;
+					LogInfo info = session.get(UUID.fromString(sisp.getCookie()));
+					boolean success = false;
+					if (info != null) {
+						success = databaseManager.setItemState(info, sisp.getItemName(), sisp.getState());
+					}
+					backPacket = new SetItemStateInfoPacket(success);
+				}
+				if (packet instanceof ImportTaxRatePacket) {
+					ImportTaxRatePacket itp = (ImportTaxRatePacket) packet;
+					LogInfo info = session.get(UUID.fromString(itp.getCookie()));
+					double rate = -1;
+					if (info != null) {
+						rate = databaseManager.getImportTaxRate(info, itp.getCity(), itp.getType());
+					}
+					backPacket = new ImportTaxRateInfoPacket(rate);
+				}
+				if (packet instanceof ExportTaxRatePacket) {
+					ExportTaxRatePacket etp = (ExportTaxRatePacket) packet;
+					LogInfo info = session.get(UUID.fromString(etp.getCookie()));
+					double rate = -1;
+					if (info != null) {
+						rate = databaseManager.getExportTaxRate(info, etp.getCity(), etp.getType());
+					}
+					backPacket = new ExportTaxRateInfoPacket(rate);
+				}
+				if (packet instanceof ItemWaitForCheckingPacket) {
+					ItemWaitForCheckingPacket iwfcp = (ItemWaitForCheckingPacket) packet;
+					LogInfo info = session.get(UUID.fromString(iwfcp.getCookie()));
+					boolean success = false;
+					if (info != null) {
+						success = databaseManager.itemWaitForChecking(info, iwfcp.getItem());
+					}
+					backPacket = new ItemWaitForCheckingInfoPacket(success);
+				}
+				if (packet instanceof LoadContainerToShipPacket) {
+					LoadContainerToShipPacket lctsp = (LoadContainerToShipPacket) packet;
+					LogInfo info = session.get(UUID.fromString(lctsp.getCookie()));
+					boolean success = false;
+					if (info != null) {
+						success = databaseManager.loadContainerToShip(info, lctsp.getShip(), lctsp.getContainerCode());
+					}
+					backPacket = new LoadContainerToShipInfoPacket(success);
+				}
+				if (packet instanceof LoadItemToContainerPacket) {
+					LoadItemToContainerPacket litcp = (LoadItemToContainerPacket) packet;
+					LogInfo info = session.get(UUID.fromString(litcp.getCookie()));
+					boolean success = false;
+					if (info != null) {
+						success = databaseManager.loadItemToContainer(info, litcp.getItem(), litcp.getContainerCode());
+					}
+					backPacket = new LoadItemToContainerInfoPacket(success);
+				}
+				if (packet instanceof StartShipSailingPacket) {
+					StartShipSailingPacket sssp = (StartShipSailingPacket) packet;
+					LogInfo info = session.get(UUID.fromString(sssp.getCookie()));
+					boolean success = false;
+					if (info != null) {
+						success = databaseManager.shipStartSailing(info, sssp.getItem());
+					}
+					backPacket = new StartShipSailingInfoPacket(success);
+				}
+				if (packet instanceof UnloadItemPacket) {
+					UnloadItemPacket uip = (UnloadItemPacket) packet;
+					LogInfo info = session.get(UUID.fromString(uip.getCookie()));
+					boolean success = false;
+					if (info != null) {
+						success = databaseManager.unloadItem(info, uip.getItem());
+					}
+					backPacket = new UnloadItemInfoPacket(success);
+				}
 				BufferedOutputStream writer = new BufferedOutputStream(socket.getOutputStream());
 				writer.write((backPacket.getCode() + "@" + backPacket.getContext()).getBytes());
 				writer.flush();
@@ -166,6 +262,15 @@ public class Main {
 			socket.close();
 				
 		}
+	}
+	
+	private static PrintWriter writer;
+	
+	public static void debug(String raw, boolean isWarnning) {
+		Calendar c = Calendar.getInstance();
+		String msg = String.format("[" + (!isWarnning ? "INFO" : "WARN") + "][%d/%d/%d %02d:%02d:%02d] %s", c.get(Calendar.YEAR), c.get(Calendar.MONTH) + 1, c.get(Calendar.DATE), c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE), c.get(Calendar.SECOND), raw);
+		writer.println(msg);
+		writer.flush();
 	}
 	
 }
