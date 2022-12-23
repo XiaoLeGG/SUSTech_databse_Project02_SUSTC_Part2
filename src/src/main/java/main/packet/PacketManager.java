@@ -1,7 +1,6 @@
 package main.packet;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
 
 import main.packet.client.CityCountPacket;
@@ -9,13 +8,16 @@ import main.packet.client.CompanyCountPacket;
 import main.packet.client.ContainerPacket;
 import main.packet.client.CourierCountPacket;
 import main.packet.client.ExportTaxRatePacket;
+import main.packet.client.GetAllItemsAtPortPacket;
 import main.packet.client.ImportTaxRatePacket;
 import main.packet.client.ItemPacket;
 import main.packet.client.ItemWaitForCheckingPacket;
 import main.packet.client.LoadContainerToShipPacket;
 import main.packet.client.LoadItemToContainerPacket;
 import main.packet.client.LoginPacket;
+import main.packet.client.LogoutPacket;
 import main.packet.client.NewItemPacket;
+import main.packet.client.SetItemCheckStatePacket;
 import main.packet.client.SetItemStatePacket;
 import main.packet.client.ShipCountPacket;
 import main.packet.client.ShipPacket;
@@ -27,6 +29,7 @@ import main.packet.server.CompanyCountInfoPacket;
 import main.packet.server.ContainerInfoPacket;
 import main.packet.server.CourierCountInfoPacket;
 import main.packet.server.ExportTaxRateInfoPacket;
+import main.packet.server.GetAllItemsAtPortInfoPacket;
 import main.packet.server.ImportTaxRateInfoPacket;
 import main.packet.server.ItemInfoPacket;
 import main.packet.server.ItemWaitForCheckingInfoPacket;
@@ -34,6 +37,7 @@ import main.packet.server.LoadContainerToShipInfoPacket;
 import main.packet.server.LoadItemToContainerInfoPacket;
 import main.packet.server.LoginInfoPacket;
 import main.packet.server.NewItemInfoPacket;
+import main.packet.server.SetItemCheckStateInfoPacket;
 import main.packet.server.SetItemStateInfoPacket;
 import main.packet.server.ShipCountInfoPacket;
 import main.packet.server.ShipInfoPacket;
@@ -90,6 +94,11 @@ public class PacketManager {
 		packetCodes.put(UnloadItemPacket.getStaticCode(), UnloadItemPacket.class);
 		packetCodes.put(StartShipSailingInfoPacket.getStaticCode(), StartShipSailingInfoPacket.class);
 		packetCodes.put(UnloadItemInfoPacket.getStaticCode(), UnloadItemInfoPacket.class);
+		packetCodes.put(GetAllItemsAtPortPacket.getStaticCode(), GetAllItemsAtPortPacket.class);
+		packetCodes.put(GetAllItemsAtPortInfoPacket.getStaticCode(), GetAllItemsAtPortInfoPacket.class);
+		packetCodes.put(SetItemCheckStatePacket.getStaticCode(), SetItemCheckStatePacket.class);
+		packetCodes.put(SetItemCheckStateInfoPacket.getStaticCode(), SetItemCheckStateInfoPacket.class);
+		packetCodes.put(LogoutPacket.getStaticCode(), LogoutPacket.class);
 	}
 	
 	public static PacketManager getInstance() {
