@@ -3,6 +3,8 @@ package main;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
@@ -12,6 +14,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.Properties;
 import java.util.UUID;
 
 import main.interfaces.ContainerInfo;
@@ -65,11 +68,50 @@ import main.packet.server.StartShipSailingInfoPacket;
 import main.packet.server.UnloadItemInfoPacket;
 
 public class Main {
-	private static final String url = "localhost:5432/cslab";
-	private static final String user = "test";
-	private static final String pass = "123456";
-	private static final int port = 23333;
-	private static final InetSocketAddress address = new InetSocketAddress("localhost", port);
+	private static String url;
+	private static String user = "test";
+	private static String pass = "123456";
+	private static int port;
+	private static InetSocketAddress address;
+	
+	static {
+		File file = new File("config.properties");
+		if (!file.exists()) {
+			try {
+				file.createNewFile();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}		
+		}
+		Properties pro = new Properties();
+		try {
+			pro.load(new FileInputStream(file));
+			if (pro.get("HOST") == null) {
+				pro.setProperty("HOST", "127.0.0.1");
+			}
+			if (pro.get("PORT") == null) {
+				pro.setProperty("PORT", "23333");
+			}
+			if (pro.get("DATABASE-URL") == null) {
+				pro.setProperty("DATABASE-URL", "localhost:5432/cslab");
+			}
+			if (pro.get("DATABASE-USER") == null) {
+				pro.setProperty("DATABASE-USER", "test");
+			}
+			if (pro.get("DATABASE-PASSWORD") == null) {
+				pro.setProperty("DATABASE-PASSWORD", "123456");
+			}
+			url = pro.getProperty("DATABASE-URL");
+			user = pro.getProperty("DATABASE-USER");
+			pass = pro.getProperty("DATABASE-PASSWORD");
+			port = Integer.parseInt(pro.getProperty("PORT"));
+			address = new InetSocketAddress(pro.getProperty("HOST"), port);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
 	
 	
 	private static HashMap<UUID, LogInfo> session;
