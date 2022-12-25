@@ -5,6 +5,7 @@ import java.io.BufferedOutputStream;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
@@ -69,8 +70,8 @@ import main.packet.server.UnloadItemInfoPacket;
 
 public class Main {
 	private static String url;
-	private static String user = "test";
-	private static String pass = "123456";
+	private static String user;
+	private static String pass;
 	private static int port;
 	private static InetSocketAddress address;
 	
@@ -107,6 +108,7 @@ public class Main {
 			pass = pro.getProperty("DATABASE-PASSWORD");
 			port = Integer.parseInt(pro.getProperty("PORT"));
 			address = new InetSocketAddress(pro.getProperty("HOST"), port);
+			pro.store(new FileOutputStream(file), "Have fun");
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
